@@ -1,4 +1,5 @@
 graph TD
+    
     subgraph Phase 1: 모델 학습 과정 (Jupyter Notebook 또는 스케줄러)
         A[과거 데이터 불러오기\nProcessed_NASDAQ.csv] --> B[데이터 스케일링 및 시퀀스 변환\nseq_len=60]
         B --> C[CNN-LSTM 하이브리드 모델 학습\nEpoch 50]
