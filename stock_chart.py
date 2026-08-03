@@ -456,9 +456,10 @@ app.layout = html.Div(style={'backgroundColor': '#101318', 'minHeight': '100vh',
                             {'label': 'MA20', 'value': 'MA20'},
                             {'label': 'MA50', 'value': 'MA50'},
                             {'label': '볼린저밴드', 'value': 'BB'},
-                            {'label': 'RSI', 'value': 'RSI'}
+                            {'label': 'RSI', 'value': 'RSI'},
+                            {'label': '매물대 (Volume Profile)', 'value': 'VP'}
                         ],
-                        value=['MA20'],
+                        value=['MA20', 'VP'],
                         className='horizontal-pill-group'
                     )
                 ])
@@ -614,6 +615,34 @@ def update_tech_summary(ticker, timeframe, n):
         else:
             range_52w = "N/A"
             
+        # Volume Profile Calculation
+        try:
+            p_min, p_max = float(df['Low'].min()), float(df['High'].max())
+            if p_max > p_min:
+                bins = np.linspace(p_min, p_max, 10)
+                df['bin'] = pd.cut(df['Close'], bins=bins)
+                vp = df.groupby('bin', observed=False)['Volume'].sum()
+                
+                poc_bin = vp.idxmax()
+                poc_price = (poc_bin.left + poc_bin.right) / 2
+                poc_vol = vp.max()
+                total_vol = vp.sum()
+                poc_pct = (poc_vol / total_vol * 100) if total_vol else 0.0
+                
+                res_bins = [b for b in vp.index if b.left > current_price]
+                sup_bins = [b for b in vp.index if b.right < current_price]
+                
+                res_poc = vp.loc[res_bins].idxmax() if res_bins and not vp.loc[res_bins].empty else None
+                sup_poc = vp.loc[sup_bins].idxmax() if sup_bins and not vp.loc[sup_bins].empty else None
+                
+                res_price_str = f"${(res_poc.left + res_poc.right)/2:,.2f}" if res_poc else "최고가 부근 (저항 약함)"
+                sup_price_str = f"${(sup_poc.left + sup_poc.right)/2:,.2f}" if sup_poc else "최저가 부근 (지지 형성중)"
+                poc_price_str = f"${poc_price:,.2f} ({poc_pct:.1f}% 거래량 집중)"
+            else:
+                poc_price_str, res_price_str, sup_price_str = "N/A", "N/A", "N/A"
+        except Exception:
+            poc_price_str, res_price_str, sup_price_str = "N/A", "N/A", "N/A"
+            
         return html.Div([
             html.Div([
                 html.Span("📈", style={'fontSize': '20px', 'marginRight': '8px'}),
@@ -696,7 +725,32 @@ def update_tech_summary(ticker, timeframe, n):
                     html.Div("52주 범위", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(range_52w, style={'fontSize': '11px', 'fontWeight': '700', 'color': '#e5e8eb', 'marginTop': '4px', 'whiteSpace': 'nowrap'})
                 ], style={'flex': '1.2', 'backgroundColor': '#141822', 'padding': '8px 6px', 'borderRadius': '10px', 'textAlign': 'center'})
-            ], style={'display': 'flex', 'gap': '8px'})
+            ], style={'display': 'flex', 'gap': '8px', 'marginBottom': '14px'}),
+            
+            # Volume Profile (매물대) Summary Section
+            html.Div("🎯 주요 매물대 (Volume Profile) 및 지지/저항", style={
+                'fontSize': '13px', 'fontWeight': '700', 'color': '#f2f4f6',
+                'borderTop': '1px solid rgba(255,255,255,0.08)', 'paddingTop': '12px', 'marginBottom': '10px'
+            }),
+            
+            html.Div([
+                html.Div([
+                    html.Div("🔥 최대 매물대 (POC)", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(poc_price_str, style={'fontSize': '13px', 'fontWeight': '700', 'color': '#f59e0b', 'marginTop': '2px'})
+                ], style={'backgroundColor': '#141822', 'padding': '8px 12px', 'borderRadius': '10px', 'marginBottom': '8px', 'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center'}),
+                
+                html.Div([
+                    html.Div([
+                        html.Div("🟥 상단 주요 저항 매물대", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                        html.Div(res_price_str, style={'fontSize': '12px', 'fontWeight': '700', 'color': '#f04452', 'marginTop': '2px'})
+                    ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px'}),
+                    
+                    html.Div([
+                        html.Div("🟩 하단 주요 지지 매물대", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                        html.Div(sup_price_str, style={'fontSize': '12px', 'fontWeight': '700', 'color': '#10b981', 'marginTop': '2px'})
+                    ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px'})
+                ], style={'display': 'flex', 'gap': '8px'})
+            ])
         ])
     except Exception as e:
         return html.Div([
@@ -960,6 +1014,41 @@ def update_chart(ticker, timeframe, chart_type, indicators, n):
                 fig.add_trace(bb_u_trace)
                 fig.add_trace(bb_l_trace)
                 
+        # Volume Profile Overlay (VP)
+        if 'VP' in indicators and not df.empty:
+            try:
+                p_min, p_max = float(df['Low'].min()), float(df['High'].max())
+                if p_max > p_min:
+                    bins = np.linspace(p_min, p_max, 10)
+                    df['bin'] = pd.cut(df['Close'], bins=bins)
+                    vp = df.groupby('bin', observed=False)['Volume'].sum()
+                    
+                    poc_bin = vp.idxmax()
+                    if poc_bin is not None:
+                        poc_price = (poc_bin.left + poc_bin.right) / 2
+                        poc_trace = go.Scatter(
+                            x=[x_vals.iloc[0], x_vals.iloc[-1]],
+                            y=[poc_price, poc_price],
+                            mode='lines',
+                            line=dict(color='#f59e0b', width=2.2, dash='dash'),
+                            name=f'최대 매물대 (POC: ${poc_price:,.2f})'
+                        )
+                        fig.add_trace(poc_trace, row=1, col=1) if show_rsi else fig.add_trace(poc_trace)
+                        
+                        max_v = vp.max() if vp.max() > 0 else 1
+                        for b, v in vp.items():
+                            if pd.notnull(b) and v > 0:
+                                v_ratio = float(v / max_v)
+                                opacity = 0.03 + (v_ratio * 0.10)
+                                fig.add_hrect(
+                                    y0=b.left, y1=b.right,
+                                    fillcolor=f"rgba(245, 158, 11, {opacity:.3f})",
+                                    line_width=0,
+                                    row=1, col=1 if show_rsi else None
+                                )
+            except Exception:
+                pass
+
         # RSI Subplot (Standard Wilder's Exponential RSI 14)
         if show_rsi:
             rsi_trace = go.Scatter(
