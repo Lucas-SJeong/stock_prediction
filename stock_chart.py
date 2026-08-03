@@ -317,13 +317,15 @@ NASDAQ_TOP10 = {
 }
 
 INDICES_AND_FUTURES = {
-    '^IXIC': '나스닥',
+    '^IXIC': '나스닥 종합',
     '^GSPC': 'S&P 500',
-    '^DJI': '다우 존스',
-    'NQ=F': '나스닥 100 선물 🌙',
-    'ES=F': 'S&P 500 선물 🌙',
-    'CL=F': 'WTI 원유',
-    'GC=F': '금 선물'
+    '^NDX': '나스닥 100',
+    'GC=F': '금 선물',
+    '^TNX': '미 10년물 국채금리',
+    'TLT': '미 장기채 (TLT)',
+    'DX-Y.NYB': '달러 인덱스 (DXY)',
+    'CL=F': 'WTI 원유 선물',
+    '^VIX': 'VIX 변동성 지수'
 }
 
 # Helper function: Fetch data with unified target candle count (~65-75 candles across all timeframes)
@@ -782,10 +784,12 @@ def update_market_info(n):
             sign = '+' if is_up else ''
             badge_bg = f"rgba(240, 68, 82, 0.12)" if is_up else f"rgba(49, 130, 246, 0.12)"
             
+            price_val_str = f"{price:.2f}%" if ticker == '^TNX' else f"{price:,.2f}"
+            
             idx_cards.append(html.Div([
                 html.Div([
                     html.Span(name, style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600', 'whiteSpace': 'nowrap'}),
-                    html.Span(f"{price:,.2f}", style={'fontSize': '17px', 'fontWeight': '800', 'color': '#f2f4f6', 'marginTop': '4px'})
+                    html.Span(price_val_str, style={'fontSize': '17px', 'fontWeight': '800', 'color': '#f2f4f6', 'marginTop': '4px'})
                 ], style={'display': 'flex', 'flexDirection': 'column'}),
                 html.Div(f"{sign}{pct:.2f}%", style={
                     'backgroundColor': badge_bg,
