@@ -42,6 +42,29 @@ MODEL_PATH = os.path.join(PROJECT_DIR, 'nasdaq_cnn_lstm.keras') if os.path.exist
 SCALER_PATH = os.path.join(PROJECT_DIR, 'nasdaq_scaler.pkl') if os.path.exists(os.path.join(PROJECT_DIR, 'nasdaq_scaler.pkl')) else 'nasdaq_scaler.pkl'
 CSV_PATH = os.path.join(PROJECT_DIR, 'Processed_NASDAQ.csv') if os.path.exists(os.path.join(PROJECT_DIR, 'Processed_NASDAQ.csv')) else 'Processed_NASDAQ.csv'
 
+# Keras 3 compatibility patch for legacy Keras 2 model deserialization
+try:
+    from keras.src.saving import serialization_lib
+    orig_deserialize = serialization_lib.deserialize_keras_object
+
+    def safe_deserialize(config, custom_objects=None, **kwargs):
+        if isinstance(config, dict):
+            def clean(d):
+                if isinstance(d, dict):
+                    for k in ['renorm', 'renorm_clipping', 'renorm_momentum', 'quantization_config', 'input_axes', 'output_axes', 'shared_object_id']:
+                        d.pop(k, None)
+                    for v in list(d.values()):
+                        clean(v)
+                elif isinstance(d, list):
+                    for item in d:
+                        clean(item)
+            clean(config)
+        return orig_deserialize(config, custom_objects=custom_objects, **kwargs)
+
+    serialization_lib.deserialize_keras_object = safe_deserialize
+except Exception:
+    pass
+
 # Load trained AI model and scaler
 model = load_model(MODEL_PATH, custom_objects={'f1': f1})
 scaler = joblib.load(SCALER_PATH)
@@ -441,6 +464,9 @@ app.layout = html.Div(style={'backgroundColor': '#101318', 'minHeight': '100vh',
             
             # Plotly Chart
             dcc.Graph(id='stock-chart', style={'height': '460px'}, config={'displayModeBar': False}),
+            
+            # Major Institutional & Fund Holders Card (Below Chart)
+            html.Div(id='institutional-holders-card', style={'marginTop': '24px', 'borderTop': '1px solid rgba(255,255,255,0.08)', 'paddingTop': '20px'})
         ]),
         
         # Right Side Column: Technical Indicators Summary, AI Prediction, Fear & Greed, News
@@ -454,6 +480,9 @@ app.layout = html.Div(style={'backgroundColor': '#101318', 'minHeight': '100vh',
             
             # Fear & Greed Sentiment Card
             html.Div(id='fear-greed-index', className='dash-card'),
+            
+            # Analyst Opinions Card
+            html.Div(id='analyst-opinions-card', className='dash-card'),
             
             # Real-time News Feed
             html.Div(id='news-feed', className='dash-card', style={'maxHeight': '320px', 'overflowY': 'auto'})
@@ -952,6 +981,236 @@ def update_news(n):
         return html.Div([
             html.Div("📰 실시간 주요 뉴스", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
             html.Div("뉴스를 불러올 수 없습니다.", style={'fontSize': '13px', 'color': '#8b95a1'})
+        ])
+
+# Analyst Opinions Callback
+@app.callback(
+    Output('analyst-opinions-card', 'children'),
+    [Input('ticker-selector', 'value'), Input('refresh-interval', 'n_intervals')]
+)
+def update_analyst_opinions(ticker, n):
+    try:
+        t_obj = yf.Ticker(ticker)
+        ud = t_obj.upgrades_downgrades
+        
+        company_name = NASDAQ_TOP10.get(ticker, ticker)
+        items = [
+            html.Div([
+                html.Span("🏛️", style={'fontSize': '20px', 'marginRight': '8px'}),
+                html.Span("월가 주요 기관 투자의견", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
+                html.Span(company_name, style={
+                    'backgroundColor': '#252d3c', 'color': '#3182f6', 'fontSize': '11px',
+                    'fontWeight': '600', 'padding': '3px 8px', 'borderRadius': '10px', 'marginLeft': 'auto'
+                })
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '14px'})
+        ]
+        
+        if ud is not None and not ud.empty:
+            recent_opinions = ud.reset_index().head(4)
+            for idx, row in recent_opinions.iterrows():
+                firm = row.get('Firm', 'Analyst')
+                grade = str(row.get('ToGrade', 'N/A'))
+                action = str(row.get('Action', ''))
+                
+                grade_date = row.get('GradeDate', '')
+                if pd.notnull(grade_date):
+                    date_str = pd.to_datetime(grade_date).strftime('%Y-%m-%d')
+                else:
+                    date_str = ""
+                    
+                grade_upper = grade.upper()
+                if any(k in grade_upper for k in ['BUY', 'OVERWEIGHT', 'OUTPERFORM', 'STRONG BUY']):
+                    badge_bg = 'rgba(240, 68, 82, 0.15)'
+                    badge_color = '#f04452'
+                    badge_label = f"매수 ({grade})"
+                elif any(k in grade_upper for k in ['SELL', 'UNDERWEIGHT', 'UNDERPERFORM']):
+                    badge_bg = 'rgba(49, 130, 246, 0.15)'
+                    badge_color = '#3182f6'
+                    badge_label = f"매도 ({grade})"
+                else:
+                    badge_bg = 'rgba(245, 158, 11, 0.15)'
+                    badge_color = '#f59e0b'
+                    badge_label = f"중립 ({grade})"
+                    
+                items.append(html.Div([
+                    html.Div([
+                        html.Span(firm, style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6'}),
+                        html.Span(date_str, style={'fontSize': '11px', 'color': '#8b95a1'})
+                    ], style={'display': 'flex', 'alignItems': 'baseline', 'justifyContent': 'space-between', 'marginBottom': '4px'}),
+                    html.Div([
+                        html.Span(badge_label, style={
+                            'backgroundColor': badge_bg,
+                            'color': badge_color,
+                            'padding': '3px 10px',
+                            'borderRadius': '8px',
+                            'fontSize': '12px',
+                            'fontWeight': '700'
+                        }),
+                        html.Span(f"구분: {action}" if action else "", style={'fontSize': '11px', 'color': '#6b7280', 'marginLeft': '8px'})
+                    ], style={'display': 'flex', 'alignItems': 'center'})
+                ], style={'padding': '10px 0', 'borderBottom': '1px solid #273040'}))
+        else:
+            items.append(html.Div("최근 투자의견 정보를 불러올 수 없습니다.", style={'fontSize': '13px', 'color': '#8b95a1'}))
+            
+        return items
+    except Exception as e:
+        return html.Div([
+            html.Div("🏛️ 월가 주요 기관 투자의견", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            html.Div(f"투자의견 데이터 로딩 실패", style={'fontSize': '13px', 'color': '#8b95a1'})
+        ])
+
+# Institutional & Ownership Breakdown Callback (Displayed Below Chart)
+@app.callback(
+    Output('institutional-holders-card', 'children'),
+    [Input('ticker-selector', 'value'), Input('refresh-interval', 'n_intervals')]
+)
+def update_institutional_holders(ticker, n):
+    try:
+        t_obj = yf.Ticker(ticker)
+        ih = t_obj.institutional_holders
+        mh = t_obj.major_holders
+        
+        company_name = NASDAQ_TOP10.get(ticker, ticker)
+        
+        header = html.Div([
+            html.Div([
+                html.Span("🏦", style={'fontSize': '20px', 'marginRight': '8px'}),
+                html.Span("기관 · 개인 · 내부자 지분율 추이 및 보유 현황", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
+                html.Span(company_name, style={
+                    'backgroundColor': '#252d3c', 'color': '#3182f6', 'fontSize': '11px',
+                    'fontWeight': '600', 'padding': '3px 8px', 'borderRadius': '10px', 'marginLeft': 'auto'
+                })
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '16px'})
+        ])
+        
+        inst_pct, insider_pct, retail_pct = 0.0, 0.0, 100.0
+        if mh is not None and not mh.empty:
+            try:
+                if 'institutionsPercentHeld' in mh.index and 'Value' in mh.columns:
+                    inst_pct = float(mh.loc['institutionsPercentHeld', 'Value']) * 100
+                elif 'institutionsPercentHeld' in mh.index and 0 in mh.columns:
+                    inst_pct = float(mh.loc['institutionsPercentHeld', 0]) * 100
+                    
+                if 'insidersPercentHeld' in mh.index and 'Value' in mh.columns:
+                    insider_pct = float(mh.loc['insidersPercentHeld', 'Value']) * 100
+                elif 'insidersPercentHeld' in mh.index and 0 in mh.columns:
+                    insider_pct = float(mh.loc['insidersPercentHeld', 0]) * 100
+                    
+                retail_pct = max(0.0, 100.0 - inst_pct - insider_pct)
+            except Exception:
+                pass
+                
+        # 1. Visual Stat Badges
+        stat_cards = html.Div([
+            html.Div([
+                html.Div("🏛️ 기관 지분율", style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600'}),
+                html.Div(f"{inst_pct:.1f}%", style={'fontSize': '20px', 'fontWeight': '800', 'color': '#3182f6', 'marginTop': '2px'})
+            ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': '4px solid #3182f6'}),
+            
+            html.Div([
+                html.Div("👥 개인 및 일반 주주", style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600'}),
+                html.Div(f"{retail_pct:.1f}%", style={'fontSize': '20px', 'fontWeight': '800', 'color': '#10b981', 'marginTop': '2px'})
+            ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': '4px solid #10b981'}),
+            
+            html.Div([
+                html.Div("👔 내부자/경영진", style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600'}),
+                html.Div(f"{insider_pct:.1f}%", style={'fontSize': '20px', 'fontWeight': '800', 'color': '#f04452', 'marginTop': '2px'})
+            ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': '4px solid #f04452'})
+        ], style={'display': 'flex', 'gap': '12px', 'marginBottom': '16px'})
+        
+        # 2. Intuitive Horizontal Stacked Bar Visualization Graph
+        fig_bar = go.Figure()
+        fig_bar.add_trace(go.Bar(
+            y=['지분율'], x=[inst_pct], name=f'기관 ({inst_pct:.1f}%)', orientation='h',
+            marker=dict(color='#3182f6', cornerradius=6),
+            hovertemplate='<b>기관 지분율</b>: %{x:.2f}%<extra></extra>'
+        ))
+        fig_bar.add_trace(go.Bar(
+            y=['지분율'], x=[retail_pct], name=f'개인 및 기타 ({retail_pct:.1f}%)', orientation='h',
+            marker=dict(color='#10b981', cornerradius=6),
+            hovertemplate='<b>개인/일반 지분율</b>: %{x:.2f}%<extra></extra>'
+        ))
+        fig_bar.add_trace(go.Bar(
+            y=['지분율'], x=[insider_pct], name=f'내부자 ({insider_pct:.1f}%)', orientation='h',
+            marker=dict(color='#f04452', cornerradius=6),
+            hovertemplate='<b>내부자 지분율</b>: %{x:.2f}%<extra></extra>'
+        ))
+        fig_bar.update_layout(
+            barmode='stack',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=70,
+            margin=dict(l=0, r=0, t=5, b=25),
+            xaxis=dict(range=[0, 100], showgrid=False, showticklabels=False, zeroline=False),
+            yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            legend=dict(
+                font=dict(color='#8b95a1', size=12),
+                orientation='h',
+                yanchor='top', y=-0.1,
+                xanchor='center', x=0.5
+            )
+        )
+        
+        chart_component = html.Div([
+            dcc.Graph(figure=fig_bar, config={'displayModeBar': False}, style={'height': '80px'})
+        ], style={'marginBottom': '20px'})
+
+        # 3. Detailed Top Institutional Holders Table
+        table_rows = []
+        if ih is not None and not ih.empty:
+            for idx, row in ih.head(6).iterrows():
+                holder = str(row.get('Holder', 'N/A'))
+                shares = row.get('Shares', 0)
+                val = row.get('Value', 0)
+                pct_held = row.get('pctHeld', 0)
+                pct_change = row.get('pctChange', 0)
+                
+                shares_str = f"{shares:,.0f}주" if isinstance(shares, (int, float)) and shares > 0 else "-"
+                
+                if isinstance(val, (int, float)) and val > 0:
+                    if val >= 1e9:
+                        val_str = f"${val/1e9:,.2f}B (약 {val/1e9*1.38:,.1f}조 원)"
+                    elif val >= 1e6:
+                        val_str = f"${val/1e6:,.1f}M (약 {val/1e6*13.8:,.0f}억 원)"
+                    else:
+                        val_str = f"${val:,.0f}"
+                else:
+                    val_str = "-"
+                    
+                pct_held_str = f"{pct_held*100:.2f}%" if isinstance(pct_held, (int, float)) and pct_held > 0 else "-"
+                
+                if isinstance(pct_change, (int, float)) and pct_change != 0:
+                    chg_sign = "+" if pct_change > 0 else ""
+                    chg_color = "#f04452" if pct_change > 0 else "#3182f6"
+                    chg_str = f"{chg_sign}{pct_change*100:.2f}%"
+                else:
+                    chg_color = "#8b95a1"
+                    chg_str = "변동없음"
+                    
+                table_rows.append(html.Tr([
+                    html.Td(holder, style={'padding': '10px 8px', 'fontWeight': '700', 'color': '#f2f4f6', 'fontSize': '13px'}),
+                    html.Td(shares_str, style={'padding': '10px 8px', 'color': '#e5e8eb', 'fontSize': '13px'}),
+                    html.Td(val_str, style={'padding': '10px 8px', 'fontWeight': '700', 'color': '#f2f4f6', 'fontSize': '13px'}),
+                    html.Td(pct_held_str, style={'padding': '10px 8px', 'color': '#8b95a1', 'fontSize': '13px'}),
+                    html.Td(html.Span(chg_str, style={'color': chg_color, 'fontWeight': '700', 'backgroundColor': 'rgba(240,68,82,0.1)' if pct_change > 0 else 'rgba(49,130,246,0.1)', 'padding': '3px 8px', 'borderRadius': '6px', 'fontSize': '12px'}), style={'padding': '10px 8px'})
+                ], style={'borderBottom': '1px solid #252d3c'}))
+
+        holders_table = html.Table([
+            html.Thead(html.Tr([
+                html.Th("주요 보유 기관 (Holder)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                html.Th("보유 주식수", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                html.Th("추정 보유 금액 (USD / KRW)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                html.Th("지분율", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                html.Th("최근 지분 변동", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'})
+            ], style={'borderBottom': '1px solid rgba(255,255,255,0.1)'})),
+            html.Tbody(table_rows)
+        ], style={'width': '100%', 'borderCollapse': 'collapse'})
+        
+        return [header, stat_cards, chart_component, holders_table]
+    except Exception as e:
+        return html.Div([
+            html.Div("🏦 주요 기관 & 펀드 매수 보유 현황", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            html.Div("기관 보유 현황 데이터를 계산할 수 없습니다.", style={'fontSize': '13px', 'color': '#8b95a1'})
         ])
 
 if __name__ == '__main__':

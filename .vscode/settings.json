@@ -1,7 +1,7 @@
 {
-    "python.defaultInterpreterPath": "/Users/lucas/miniconda3/envs/stock_env/bin/python",
+    "python.defaultInterpreterPath": "C:\\Users\\kccistc\\stock_prediction-1\\.venv\\Scripts\\python.exe",
     "code-runner.executorMap": {
-        "python": "/Users/lucas/miniconda3/envs/stock_env/bin/python -u"
+        "python": "C:\\Users\\kccistc\\stock_prediction-1\\.venv\\Scripts\\python.exe -u"
     },
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda"
