@@ -1566,7 +1566,7 @@ def update_institutional_holders(ticker, n):
             ], style={'width': '100%', 'borderCollapse': 'collapse'})
         ]) if insider_rows else html.Div()
         
-        return [header, stat_cards, trend_component, bar_component, firm_table, insider_table]
+        return [header, stat_cards, bar_component, trend_component, firm_table, insider_table]
     except Exception as e:
         import traceback
         traceback.print_exc()
