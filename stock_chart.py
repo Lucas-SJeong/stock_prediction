@@ -1150,49 +1150,44 @@ def update_institutional_holders(ticker, n):
         t1_trend = [round(max(0.0, t1_pct - 0.5), 2), round(max(0.0, t1_pct - 0.4), 2), round(max(0.0, t1_pct - 0.2), 2), round(max(0.0, t1_pct - 0.1), 2), round(max(0.0, t1_pct + 0.1), 2), round(t1_pct, 2)]
         t2_trend = [round(max(0.0, t2_pct - 0.4), 2), round(max(0.0, t2_pct - 0.3), 2), round(max(0.0, t2_pct - 0.25), 2), round(max(0.0, t2_pct - 0.1), 2), round(max(0.0, t2_pct - 0.05), 2), round(t2_pct, 2)]
         t3_trend = [round(max(0.0, t3_pct - 0.3), 2), round(max(0.0, t3_pct - 0.2), 2), round(max(0.0, t3_pct - 0.15), 2), round(max(0.0, t3_pct - 0.1), 2), round(max(0.0, t3_pct + 0.05), 2), round(t3_pct, 2)]
-        inst_total_trend = [round(max(0.0, inst_pct - 2.5), 2), round(max(0.0, inst_pct - 1.8), 2), round(max(0.0, inst_pct - 1.2), 2), round(max(0.0, inst_pct - 0.6), 2), round(max(0.0, inst_pct - 0.2), 2), round(inst_pct, 2)]
+        
+        all_vals = t1_trend + t2_trend + t3_trend
+        y_min = max(0.0, min(all_vals) - 0.6) if all_vals else 0.0
+        y_max = max(all_vals) + 0.6 if all_vals else 10.0
 
         fig_trend = go.Figure()
         
         # 1st Top Institution Trace
         fig_trend.add_trace(go.Scatter(
             x=dates, y=t1_trend, mode='lines+markers', name=f"1위: {top3_list[0]['name']}",
-            line=dict(color=colors[0], width=3, shape='spline'),
-            marker=dict(size=7, color=colors[0]),
+            line=dict(color=colors[0], width=3.5, shape='spline'),
+            marker=dict(size=8, color=colors[0]),
             hovertemplate=f"<b>{top3_list[0]['name']}</b>: %{{y:.2f}}%<br><b>일자/분기</b>: %{{x}}<extra></extra>"
         ))
         
         # 2nd Top Institution Trace
         fig_trend.add_trace(go.Scatter(
             x=dates, y=t2_trend, mode='lines+markers', name=f"2위: {top3_list[1]['name']}",
-            line=dict(color=colors[1], width=3, shape='spline'),
-            marker=dict(size=7, color=colors[1]),
+            line=dict(color=colors[1], width=3.5, shape='spline'),
+            marker=dict(size=8, color=colors[1]),
             hovertemplate=f"<b>{top3_list[1]['name']}</b>: %{{y:.2f}}%<br><b>일자/분기</b>: %{{x}}<extra></extra>"
         ))
         
         # 3rd Top Institution Trace
         fig_trend.add_trace(go.Scatter(
             x=dates, y=t3_trend, mode='lines+markers', name=f"3위: {top3_list[2]['name']}",
-            line=dict(color=colors[2], width=3, shape='spline'),
-            marker=dict(size=7, color=colors[2]),
+            line=dict(color=colors[2], width=3.5, shape='spline'),
+            marker=dict(size=8, color=colors[2]),
             hovertemplate=f"<b>{top3_list[2]['name']}</b>: %{{y:.2f}}%<br><b>일자/분기</b>: %{{x}}<extra></extra>"
-        ))
-        
-        # Total Institutions Summary Trace
-        fig_trend.add_trace(go.Scatter(
-            x=dates, y=inst_total_trend, mode='lines+markers', name='전체 기관 총합 (Total Inst)',
-            line=dict(color='#f59e0b', width=2, dash='dash', shape='spline'),
-            marker=dict(size=5, color='#f59e0b'),
-            hovertemplate='<b>전체 기관 총 지분율</b>: %{y:.2f}%<br><b>일자/분기</b>: %{x}<extra></extra>'
         ))
         
         fig_trend.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            height=210,
-            margin=dict(l=35, r=15, t=10, b=35),
+            height=260,
+            margin=dict(l=40, r=20, t=10, b=35),
             xaxis=dict(showgrid=True, gridcolor='#252d3c', tickfont=dict(color='#8b95a1', size=11)),
-            yaxis=dict(showgrid=True, gridcolor='#252d3c', tickfont=dict(color='#8b95a1', size=11), ticksuffix='%'),
+            yaxis=dict(showgrid=True, gridcolor='#252d3c', range=[y_min, y_max], tickfont=dict(color='#8b95a1', size=11), ticksuffix='%'),
             legend=dict(
                 font=dict(color='#8b95a1', size=11),
                 orientation='h',
@@ -1202,9 +1197,9 @@ def update_institutional_holders(ticker, n):
         )
         
         trend_component = html.Div([
-            html.Div(f"📈 상위 Top 3 보유 기관별 날짜/분기 지분율 추이 ({company_name})", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
-            dcc.Graph(figure=fig_trend, config={'displayModeBar': False}, style={'height': '210px'})
-        ], style={'backgroundColor': '#141822', 'padding': '14px', 'borderRadius': '14px', 'marginBottom': '20px'})
+            html.Div(f"📈 Top 3 보유 기관별 지분율 상세 추이 변화 ({company_name})", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            dcc.Graph(figure=fig_trend, config={'displayModeBar': False}, style={'height': '260px'})
+        ], style={'backgroundColor': '#141822', 'padding': '16px', 'borderRadius': '14px', 'marginBottom': '20px'})
 
         # 3. Horizontal Stacked Bar Visualization Graph
         fig_bar = go.Figure()
