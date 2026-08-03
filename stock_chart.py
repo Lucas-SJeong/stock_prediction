@@ -1228,9 +1228,67 @@ def update_analyst_opinions(ticker, n):
         num_analysts = int(info.get('numberOfAnalystOpinions', 35)) if info.get('numberOfAnalystOpinions') else 35
         
         consensus_upside = ((target_mean - curr_price) / curr_price * 100) if curr_price else 0.0
-        consensus_acc = min(94.2, max(72.0, 84.5 + (consensus_upside * 0.15))) if curr_price else 82.5
+        
+        # ── Empirical Target Price Hit/Miss Evaluation ──
+        # For each firm's grade revision, check if the stock price reached
+        # the implied target between that revision date and the next revision date.
+        hist_2y = t_obj.history(period='2y')
+        firm_accuracy = {}  # {firm_name: {'hits': int, 'total': int}}
+        total_hits = 0
+        total_evals = 0
+        
+        if ud is not None and not ud.empty and not hist_2y.empty:
+            if hist_2y.index.tz is not None:
+                hist_2y.index = hist_2y.index.tz_localize(None)
+                
+            ud_sorted = ud.reset_index()
+            ud_sorted['GradeDate'] = pd.to_datetime(ud_sorted['GradeDate'])
+            if ud_sorted['GradeDate'].dt.tz is not None:
+                ud_sorted['GradeDate'] = ud_sorted['GradeDate'].dt.tz_localize(None)
+            ud_sorted = ud_sorted.sort_values('GradeDate', ascending=True)
+            
+            for i in range(len(ud_sorted)):
+                r = ud_sorted.iloc[i]
+                f_name = str(r.get('Firm', 'Analyst'))
+                g_date = r.get('GradeDate')
+                g_grade = str(r.get('ToGrade', 'Hold')).upper()
+                
+                # Period: from this revision date to the next revision date
+                remaining = ud_sorted.iloc[i+1:]
+                end_date = remaining['GradeDate'].iloc[0] if not remaining.empty else pd.Timestamp.now()
+                
+                sub = hist_2y[(hist_2y.index >= g_date) & (hist_2y.index <= end_date)]
+                if sub.empty:
+                    continue
+                    
+                max_p = float(sub['High'].max())
+                min_p = float(sub['Low'].min())
+                start_p = float(sub['Close'].iloc[0])
+                
+                if any(k in g_grade for k in ['BUY', 'OVERWEIGHT', 'OUTPERFORM', 'STRONG BUY']):
+                    implied_target = start_p * 1.12
+                    is_hit = max_p >= (implied_target * 0.95)
+                elif any(k in g_grade for k in ['SELL', 'UNDERWEIGHT', 'UNDERPERFORM']):
+                    implied_target = start_p * 0.88
+                    is_hit = min_p <= (implied_target * 1.05)
+                else:
+                    # Neutral/Hold: price stays within ±12% range
+                    is_hit = abs(float(sub['Close'].iloc[-1]) - start_p) / start_p <= 0.12
+                    
+                total_evals += 1
+                if is_hit:
+                    total_hits += 1
+                    
+                if f_name not in firm_accuracy:
+                    firm_accuracy[f_name] = {'hits': 0, 'total': 0}
+                firm_accuracy[f_name]['total'] += 1
+                if is_hit:
+                    firm_accuracy[f_name]['hits'] += 1
+        
+        consensus_acc = (total_hits / total_evals * 100) if total_evals > 0 else 0.0
         
         # Consensus Target Price & Accuracy Rate Summary Box
+        acc_color = '#f04452' if consensus_acc < 30 else ('#f59e0b' if consensus_acc < 55 else '#10b981')
         summary_box = html.Div([
             html.Div([
                 html.Div([
@@ -1240,15 +1298,17 @@ def update_analyst_opinions(ticker, n):
                 ], style={'flex': '1.1', 'backgroundColor': '#141822', 'padding': '10px', 'borderRadius': '12px'}),
                 
                 html.Div([
-                    html.Div("🎯 목표가 예측 정답률", style={'fontSize': '11px', 'color': '#8b95a1'}),
-                    html.Div(f"{consensus_acc:.1f}%", style={'fontSize': '16px', 'fontWeight': '800', 'color': '#10b981', 'marginTop': '2px'}),
-                    html.Div(f"{num_analysts}개 기관 참여", style={'fontSize': '11px', 'color': '#8b95a1', 'fontWeight': '600'})
+                    html.Div("🎯 목표가 달성 정답률", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(f"{consensus_acc:.1f}%", style={'fontSize': '16px', 'fontWeight': '800', 'color': acc_color, 'marginTop': '2px'}),
+                    html.Div(f"{total_hits}/{total_evals}회 달성 ({num_analysts}개 기관)", style={'fontSize': '10px', 'color': '#8b95a1', 'fontWeight': '600'})
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px', 'borderRadius': '12px'})
-            ], style={'display': 'flex', 'gap': '10px', 'marginBottom': '14px'}),
+            ], style={'display': 'flex', 'gap': '10px', 'marginBottom': '10px'}),
             
             html.Div([
                 html.Span("목표가 범위: ", style={'fontSize': '11px', 'color': '#8b95a1'}),
-                html.Span(f"${target_low:,.0f} ~ ${target_high:,.0f}", style={'fontSize': '12px', 'fontWeight': '700', 'color': '#e5e8eb'})
+                html.Span(f"${target_low:,.0f} ~ ${target_high:,.0f}", style={'fontSize': '12px', 'fontWeight': '700', 'color': '#e5e8eb'}),
+                html.Span("  |  ", style={'color': '#333', 'margin': '0 4px'}),
+                html.Span("평가 기준: 수정일~다음 수정일 사이 목표가 도달 여부", style={'fontSize': '10px', 'color': '#6b7280'})
             ], style={'marginBottom': '14px', 'backgroundColor': 'rgba(255,255,255,0.03)', 'padding': '6px 10px', 'borderRadius': '8px'})
         ])
         items.append(summary_box)
@@ -1269,22 +1329,29 @@ def update_analyst_opinions(ticker, n):
                     badge_color = '#f04452'
                     badge_label = f"매수 ({grade})"
                     firm_target = target_mean * (1.04 + (idx * 0.015))
-                    firm_acc = round(min(94.8, max(75.0, 86.2 + (len(firm) % 7) * 1.1)), 1)
                 elif any(k in grade_upper for k in ['SELL', 'UNDERWEIGHT', 'UNDERPERFORM']):
                     badge_bg = 'rgba(49, 130, 246, 0.15)'
                     badge_color = '#3182f6'
                     badge_label = f"매도 ({grade})"
                     firm_target = target_low * 0.96
-                    firm_acc = round(min(92.0, max(70.0, 78.4 + (len(firm) % 5) * 1.2)), 1)
                 else:
                     badge_bg = 'rgba(245, 158, 11, 0.15)'
                     badge_color = '#f59e0b'
                     badge_label = f"중립 ({grade})"
                     firm_target = target_mean * 0.97
-                    firm_acc = round(min(91.0, max(72.0, 81.5 + (len(firm) % 6) * 1.0)), 1)
-                    
-                firm_upside = ((firm_target - curr_price) / curr_price * 100) if curr_price else 0.0
                 
+                # Per-firm empirical accuracy from historical hit/miss data
+                fa = firm_accuracy.get(firm, {})
+                fa_hits = fa.get('hits', 0)
+                fa_total = fa.get('total', 0)
+                if fa_total > 0:
+                    firm_acc = round(fa_hits / fa_total * 100, 1)
+                    firm_acc_label = f"{firm_acc}% ({fa_hits}/{fa_total}회)"
+                    firm_acc_color = '#f04452' if firm_acc < 30 else ('#f59e0b' if firm_acc < 55 else '#10b981')
+                else:
+                    firm_acc_label = "데이터 부족"
+                    firm_acc_color = '#6b7280'
+                    
                 items.append(html.Div([
                     html.Div([
                         html.Span(firm, style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6'}),
@@ -1302,7 +1369,7 @@ def update_analyst_opinions(ticker, n):
                         }),
                         html.Div([
                             html.Span(f"목표가: ${firm_target:,.2f}", style={'fontSize': '12px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginRight': '6px'}),
-                            html.Span(f"({firm_acc}% 적중률)", style={'fontSize': '11px', 'fontWeight': '600', 'color': '#10b981'})
+                            html.Span(f"적중률: {firm_acc_label}", style={'fontSize': '11px', 'fontWeight': '600', 'color': firm_acc_color})
                         ], style={'marginLeft': 'auto', 'display': 'flex', 'alignItems': 'center'})
                     ], style={'display': 'flex', 'alignItems': 'center', 'marginTop': '4px'})
                 ], style={'padding': '10px 0', 'borderBottom': '1px solid #273040'}))
