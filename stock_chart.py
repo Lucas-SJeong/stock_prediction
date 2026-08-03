@@ -1026,28 +1026,62 @@ def update_chart(ticker, timeframe, chart_type, indicators, n):
                     poc_bin = vp.idxmax()
                     if poc_bin is not None:
                         poc_price = (poc_bin.left + poc_bin.right) / 2
+                        
+                        # POC High-Visibility Horizontal Dashed Line
                         poc_trace = go.Scatter(
-                            x=[x_vals.iloc[0], x_vals.iloc[-1]],
+                            x=[x_vals[0], x_vals[-1]],
                             y=[poc_price, poc_price],
                             mode='lines',
-                            line=dict(color='#f59e0b', width=2.2, dash='dash'),
-                            name=f'최대 매물대 (POC: ${poc_price:,.2f})'
+                            line=dict(color='#f59e0b', width=2.5, dash='dash'),
+                            name=f'🔥 최대 매물대 (POC: ${poc_price:,.2f})'
                         )
-                        fig.add_trace(poc_trace, row=1, col=1) if show_rsi else fig.add_trace(poc_trace)
+                        if show_rsi:
+                            fig.add_trace(poc_trace, row=1, col=1)
+                        else:
+                            fig.add_trace(poc_trace)
                         
-                        max_v = vp.max() if vp.max() > 0 else 1
+                        # Project Volume Profile Bars on Chart
+                        max_v = float(vp.max()) if vp.max() > 0 else 1.0
+                        n_points = len(x_vals)
+                        
                         for b, v in vp.items():
                             if pd.notnull(b) and v > 0:
                                 v_ratio = float(v / max_v)
-                                opacity = 0.03 + (v_ratio * 0.10)
-                                fig.add_hrect(
-                                    y0=b.left, y1=b.right,
-                                    fillcolor=f"rgba(245, 158, 11, {opacity:.3f})",
-                                    line_width=0,
-                                    row=1, col=1 if show_rsi else None
+                                opacity = 0.06 + (v_ratio * 0.18)
+                                bar_color = '#f59e0b' if b == poc_bin else '#3182f6'
+                                
+                                p_mid = (b.left + b.right) / 2
+                                bar_len = max(2, int(n_points * 0.30 * v_ratio))
+                                start_idx = max(0, n_points - bar_len)
+                                
+                                # Volume Bar Trace (Right-projected)
+                                vbar_trace = go.Scatter(
+                                    x=[x_vals[start_idx], x_vals[-1]],
+                                    y=[p_mid, p_mid],
+                                    mode='lines',
+                                    line=dict(color=bar_color, width=8),
+                                    opacity=0.85,
+                                    name=f'매물대 ${p_mid:,.1f}',
+                                    hovertemplate=f"<b>매물대 구간</b>: ${b.left:,.2f} ~ ${b.right:,.2f}<br><b>누적 거래량</b>: {v:,.0f}주<extra></extra>"
                                 )
-            except Exception:
-                pass
+                                
+                                if show_rsi:
+                                    fig.add_trace(vbar_trace, row=1, col=1)
+                                    fig.add_hrect(
+                                        y0=b.left, y1=b.right,
+                                        fillcolor=f"rgba(245, 158, 11, {opacity:.3f})",
+                                        line_width=0, row=1, col=1
+                                    )
+                                else:
+                                    fig.add_trace(vbar_trace)
+                                    fig.add_hrect(
+                                        y0=b.left, y1=b.right,
+                                        fillcolor=f"rgba(245, 158, 11, {opacity:.3f})",
+                                        line_width=0
+                                    )
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
 
         # RSI Subplot (Standard Wilder's Exponential RSI 14)
         if show_rsi:
