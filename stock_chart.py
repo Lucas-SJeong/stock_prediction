@@ -1233,8 +1233,9 @@ def update_analyst_opinions(ticker, n):
         # For each firm's grade revision, check if the stock price reached
         # the implied target between that revision date and the next revision date.
         hist_2y = t_obj.history(period='2y')
-        firm_accuracy = {}  # {firm_name: {'hits': int, 'total': int}}
+        firm_accuracy = {}  # {firm_name: {'hits': int, 'total': int, 'trend_hits': int}}
         total_hits = 0
+        total_trend_hits = 0
         total_evals = 0
         
         if ud is not None and not ud.empty and not hist_2y.empty:
@@ -1264,51 +1265,68 @@ def update_analyst_opinions(ticker, n):
                 max_p = float(sub['High'].max())
                 min_p = float(sub['Low'].min())
                 start_p = float(sub['Close'].iloc[0])
+                end_p = float(sub['Close'].iloc[-1])
                 
+                # Target price accuracy
                 if any(k in g_grade for k in ['BUY', 'OVERWEIGHT', 'OUTPERFORM', 'STRONG BUY']):
                     implied_target = start_p * 1.08
                     is_hit = max_p >= (implied_target * 0.97)
+                    is_trend = end_p > start_p  # 매수 의견 → 기간 종료 시 상승했는지
                 elif any(k in g_grade for k in ['SELL', 'UNDERWEIGHT', 'UNDERPERFORM']):
                     implied_target = start_p * 0.92
                     is_hit = min_p <= (implied_target * 1.03)
+                    is_trend = end_p < start_p  # 매도 의견 → 기간 종료 시 하락했는지
                 else:
                     # Neutral/Hold: price stays within ±15% range
-                    is_hit = abs(float(sub['Close'].iloc[-1]) - start_p) / start_p <= 0.15
+                    is_hit = abs(end_p - start_p) / start_p <= 0.15
+                    is_trend = abs(end_p - start_p) / start_p <= 0.10  # 중립 → 큰 변동 없었는지
                     
                 total_evals += 1
                 if is_hit:
                     total_hits += 1
+                if is_trend:
+                    total_trend_hits += 1
                     
                 if f_name not in firm_accuracy:
-                    firm_accuracy[f_name] = {'hits': 0, 'total': 0}
+                    firm_accuracy[f_name] = {'hits': 0, 'total': 0, 'trend_hits': 0}
                 firm_accuracy[f_name]['total'] += 1
                 if is_hit:
                     firm_accuracy[f_name]['hits'] += 1
+                if is_trend:
+                    firm_accuracy[f_name]['trend_hits'] += 1
         
         consensus_acc = (total_hits / total_evals * 100) if total_evals > 0 else 0.0
+        consensus_trend = (total_trend_hits / total_evals * 100) if total_evals > 0 else 0.0
         
         # Consensus Target Price & Accuracy Rate Summary Box
         acc_color = '#f04452' if consensus_acc < 30 else ('#f59e0b' if consensus_acc < 55 else '#10b981')
+        trend_color = '#f04452' if consensus_trend < 40 else ('#f59e0b' if consensus_trend < 60 else '#10b981')
         summary_box = html.Div([
             html.Div([
                 html.Div([
                     html.Div("🎯 컨센서스 목표 주가", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(f"${target_mean:,.2f}", style={'fontSize': '16px', 'fontWeight': '800', 'color': '#f2f4f6', 'marginTop': '2px'}),
                     html.Div(f"상승 여력 {consensus_upside:+.1f}%", style={'fontSize': '11px', 'fontWeight': '700', 'color': '#f04452' if consensus_upside >= 0 else '#3182f6'})
-                ], style={'flex': '1.1', 'backgroundColor': '#141822', 'padding': '10px', 'borderRadius': '12px'}),
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px', 'borderRadius': '12px'}),
                 
                 html.Div([
-                    html.Div("🎯 목표가 달성 정답률", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("🎯 목표가 달성률", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(f"{consensus_acc:.1f}%", style={'fontSize': '16px', 'fontWeight': '800', 'color': acc_color, 'marginTop': '2px'}),
-                    html.Div(f"{total_hits}/{total_evals}회 달성 ({num_analysts}개 기관)", style={'fontSize': '10px', 'color': '#8b95a1', 'fontWeight': '600'})
+                    html.Div(f"{total_hits}/{total_evals}회 달성", style={'fontSize': '10px', 'color': '#8b95a1', 'fontWeight': '600'})
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px', 'borderRadius': '12px'}),
+                
+                html.Div([
+                    html.Div("📈 추세 정답률", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(f"{consensus_trend:.1f}%", style={'fontSize': '16px', 'fontWeight': '800', 'color': trend_color, 'marginTop': '2px'}),
+                    html.Div(f"{total_trend_hits}/{total_evals}회 적중", style={'fontSize': '10px', 'color': '#8b95a1', 'fontWeight': '600'})
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px', 'borderRadius': '12px'})
-            ], style={'display': 'flex', 'gap': '10px', 'marginBottom': '10px'}),
+            ], style={'display': 'flex', 'gap': '8px', 'marginBottom': '10px'}),
             
             html.Div([
                 html.Span("목표가 범위: ", style={'fontSize': '11px', 'color': '#8b95a1'}),
                 html.Span(f"${target_low:,.0f} ~ ${target_high:,.0f}", style={'fontSize': '12px', 'fontWeight': '700', 'color': '#e5e8eb'}),
                 html.Span("  |  ", style={'color': '#333', 'margin': '0 4px'}),
-                html.Span("평가 기준: 수정일~다음 수정일 사이 목표가 도달 여부", style={'fontSize': '10px', 'color': '#6b7280'})
+                html.Span("추세: 의견 수정 전까지 예측 방향 일치 여부", style={'fontSize': '10px', 'color': '#6b7280'})
             ], style={'marginBottom': '14px', 'backgroundColor': 'rgba(255,255,255,0.03)', 'padding': '6px 10px', 'borderRadius': '8px'})
         ])
         items.append(summary_box)
@@ -1343,14 +1361,22 @@ def update_analyst_opinions(ticker, n):
                 # Per-firm empirical accuracy from historical hit/miss data
                 fa = firm_accuracy.get(firm, {})
                 fa_hits = fa.get('hits', 0)
+                fa_trend = fa.get('trend_hits', 0)
                 fa_total = fa.get('total', 0)
                 if fa_total > 0:
                     firm_acc = round(fa_hits / fa_total * 100, 1)
-                    firm_acc_label = f"{firm_acc}% ({fa_hits}/{fa_total}회)"
+                    firm_trend = round(fa_trend / fa_total * 100, 1)
+                    firm_acc_label = f"목표: {firm_acc}%"
+                    firm_trend_label = f"추세: {firm_trend}%"
                     firm_acc_color = '#f04452' if firm_acc < 30 else ('#f59e0b' if firm_acc < 55 else '#10b981')
+                    firm_trend_color = '#f04452' if firm_trend < 40 else ('#f59e0b' if firm_trend < 60 else '#10b981')
+                    firm_detail = f"({fa_hits}/{fa_total}회)"
                 else:
                     firm_acc_label = "데이터 부족"
+                    firm_trend_label = ""
                     firm_acc_color = '#6b7280'
+                    firm_trend_color = '#6b7280'
+                    firm_detail = ""
                     
                 items.append(html.Div([
                     html.Div([
@@ -1367,11 +1393,14 @@ def update_analyst_opinions(ticker, n):
                             'fontSize': '12px',
                             'fontWeight': '700'
                         }),
-                        html.Div([
-                            html.Span(f"목표가: ${firm_target:,.2f}", style={'fontSize': '12px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginRight': '6px'}),
-                            html.Span(f"적중률: {firm_acc_label}", style={'fontSize': '11px', 'fontWeight': '600', 'color': firm_acc_color})
-                        ], style={'marginLeft': 'auto', 'display': 'flex', 'alignItems': 'center'})
-                    ], style={'display': 'flex', 'alignItems': 'center', 'marginTop': '4px'})
+                        html.Span(f"목표가: ${firm_target:,.2f}", style={'fontSize': '12px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginLeft': '8px'})
+                    ], style={'display': 'flex', 'alignItems': 'center', 'marginTop': '4px'}),
+                    
+                    html.Div([
+                        html.Span(firm_acc_label, style={'fontSize': '11px', 'fontWeight': '600', 'color': firm_acc_color, 'marginRight': '10px'}),
+                        html.Span(firm_trend_label, style={'fontSize': '11px', 'fontWeight': '600', 'color': firm_trend_color, 'marginRight': '6px'}),
+                        html.Span(firm_detail, style={'fontSize': '10px', 'color': '#6b7280'})
+                    ], style={'marginTop': '4px'}) if fa_total > 0 else html.Div()
                 ], style={'padding': '10px 0', 'borderBottom': '1px solid #273040'}))
         else:
             items.append(html.Div("최근 투자의견 정보를 불러올 수 없습니다.", style={'fontSize': '13px', 'color': '#8b95a1'}))
