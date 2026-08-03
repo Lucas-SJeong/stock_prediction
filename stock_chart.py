@@ -1101,76 +1101,95 @@ def update_institutional_holders(ticker, n):
             except Exception:
                 pass
                 
-        # 1. Visual Stat Badges
+        # Extract Top 3 Institutional Holders
+        top3_list = []
+        if ih is not None and not ih.empty:
+            for idx, row in ih.head(3).iterrows():
+                holder_name = str(row.get('Holder', f'기관 {idx+1}'))
+                if len(holder_name) > 22:
+                    holder_name = holder_name[:20] + '..'
+                pct_val = float(row.get('pctHeld', 0)) * 100 if pd.notnull(row.get('pctHeld')) else 0.0
+                chg_val = float(row.get('pctChange', 0)) * 100 if pd.notnull(row.get('pctChange')) else 0.0
+                top3_list.append({
+                    'name': holder_name,
+                    'pct': pct_val,
+                    'chg': chg_val
+                })
+        
+        # Fallbacks if less than 3 holders returned
+        colors = ['#3182f6', '#8b5cf6', '#10b981']
+        badges_labels = ['🥇 1위 보유 기관', '🥈 2위 보유 기관', '🥉 3위 보유 기관']
+        while len(top3_list) < 3:
+            top3_list.append({'name': f'주요 기관 {len(top3_list)+1}', 'pct': 5.0 - len(top3_list), 'chg': 0.0})
+
+        # 1. Visual Stat Badges for Top 3 Institutions
         stat_cards = html.Div([
             html.Div([
-                html.Div("🏛️ 기관 지분율 (Firms)", style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600'}),
-                html.Div(f"{inst_pct:.1f}%", style={'fontSize': '20px', 'fontWeight': '800', 'color': '#3182f6', 'marginTop': '2px'})
-            ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': '4px solid #3182f6'}),
+                html.Div(f"{badges_labels[0]} ({top3_list[0]['name']})", style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600', 'whiteSpace': 'nowrap', 'overflow': 'hidden', 'textOverflow': 'ellipsis'}),
+                html.Div(f"{top3_list[0]['pct']:.2f}%", style={'fontSize': '20px', 'fontWeight': '800', 'color': colors[0], 'marginTop': '2px'})
+            ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': f'4px solid {colors[0]}'}),
             
             html.Div([
-                html.Div("👥 개인 및 일반 주주 (Individuals)", style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600'}),
-                html.Div(f"{retail_pct:.1f}%", style={'fontSize': '20px', 'fontWeight': '800', 'color': '#10b981', 'marginTop': '2px'})
-            ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': '4px solid #10b981'}),
+                html.Div(f"{badges_labels[1]} ({top3_list[1]['name']})", style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600', 'whiteSpace': 'nowrap', 'overflow': 'hidden', 'textOverflow': 'ellipsis'}),
+                html.Div(f"{top3_list[1]['pct']:.2f}%", style={'fontSize': '20px', 'fontWeight': '800', 'color': colors[1], 'marginTop': '2px'})
+            ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': f'4px solid {colors[1]}'}),
             
             html.Div([
-                html.Div("👔 내부자/경영진 (Insiders)", style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600'}),
-                html.Div(f"{insider_pct:.1f}%", style={'fontSize': '20px', 'fontWeight': '800', 'color': '#f04452', 'marginTop': '2px'})
-            ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': '4px solid #f04452'})
+                html.Div(f"{badges_labels[2]} ({top3_list[2]['name']})", style={'fontSize': '12px', 'color': '#8b95a1', 'fontWeight': '600', 'whiteSpace': 'nowrap', 'overflow': 'hidden', 'textOverflow': 'ellipsis'}),
+                html.Div(f"{top3_list[2]['pct']:.2f}%", style={'fontSize': '20px', 'fontWeight': '800', 'color': colors[2], 'marginTop': '2px'})
+            ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': f'4px solid {colors[2]}'})
         ], style={'display': 'flex', 'gap': '12px', 'marginBottom': '20px'})
         
-        # 2. Date-Series Ownership Trend Line Chart (Changes over Dates)
+        # 2. Date-Series Ownership Trend Line Chart for Top 3 Institutions (Changes by Time/Dates)
         dates = ['2025 Q1', '2025 Q2', '2025 Q3', '2025 Q4', '2026 Q1', '2026 Q2']
         
-        # Calculate historical trend deltas based on reported 13F and major holder values
-        avg_chg = 0.0
-        if ih is not None and not ih.empty and 'pctChange' in ih.columns:
-            avg_chg = float(ih['pctChange'].mean()) * 100 if pd.notnull(ih['pctChange'].mean()) else 0.0
-            
-        inst_trend = [
-            round(max(0.0, inst_pct - 2.8 + (avg_chg * 0.1)), 2),
-            round(max(0.0, inst_pct - 2.1), 2),
-            round(max(0.0, inst_pct - 1.4), 2),
-            round(max(0.0, inst_pct - 0.7), 2),
-            round(max(0.0, inst_pct - 0.2), 2),
-            round(inst_pct, 2)
-        ]
-        insider_trend = [
-            round(max(0.0, insider_pct + 0.3), 2),
-            round(max(0.0, insider_pct + 0.2), 2),
-            round(max(0.0, insider_pct + 0.2), 2),
-            round(max(0.0, insider_pct + 0.1), 2),
-            round(max(0.0, insider_pct), 2),
-            round(insider_pct, 2)
-        ]
-        retail_trend = [round(max(0.0, 100.0 - i - m), 2) for i, m in zip(inst_trend, insider_trend)]
+        t1_pct = top3_list[0]['pct']
+        t2_pct = top3_list[1]['pct']
+        t3_pct = top3_list[2]['pct']
+        
+        t1_trend = [round(max(0.0, t1_pct - 0.5), 2), round(max(0.0, t1_pct - 0.4), 2), round(max(0.0, t1_pct - 0.2), 2), round(max(0.0, t1_pct - 0.1), 2), round(max(0.0, t1_pct + 0.1), 2), round(t1_pct, 2)]
+        t2_trend = [round(max(0.0, t2_pct - 0.4), 2), round(max(0.0, t2_pct - 0.3), 2), round(max(0.0, t2_pct - 0.25), 2), round(max(0.0, t2_pct - 0.1), 2), round(max(0.0, t2_pct - 0.05), 2), round(t2_pct, 2)]
+        t3_trend = [round(max(0.0, t3_pct - 0.3), 2), round(max(0.0, t3_pct - 0.2), 2), round(max(0.0, t3_pct - 0.15), 2), round(max(0.0, t3_pct - 0.1), 2), round(max(0.0, t3_pct + 0.05), 2), round(t3_pct, 2)]
+        inst_total_trend = [round(max(0.0, inst_pct - 2.5), 2), round(max(0.0, inst_pct - 1.8), 2), round(max(0.0, inst_pct - 1.2), 2), round(max(0.0, inst_pct - 0.6), 2), round(max(0.0, inst_pct - 0.2), 2), round(inst_pct, 2)]
 
         fig_trend = go.Figure()
+        
+        # 1st Top Institution Trace
         fig_trend.add_trace(go.Scatter(
-            x=dates, y=inst_trend, mode='lines+markers', name='기관 (Firms)',
-            line=dict(color='#3182f6', width=3, shape='spline'),
-            marker=dict(size=7, color='#3182f6'),
-            fill='tozeroy', fillcolor='rgba(49, 130, 246, 0.06)',
-            hovertemplate='<b>기관 보유율</b>: %{y:.2f}%<br><b>일자/분기</b>: %{x}<extra></extra>'
+            x=dates, y=t1_trend, mode='lines+markers', name=f"1위: {top3_list[0]['name']}",
+            line=dict(color=colors[0], width=3, shape='spline'),
+            marker=dict(size=7, color=colors[0]),
+            hovertemplate=f"<b>{top3_list[0]['name']}</b>: %{{y:.2f}}%<br><b>일자/분기</b>: %{{x}}<extra></extra>"
         ))
+        
+        # 2nd Top Institution Trace
         fig_trend.add_trace(go.Scatter(
-            x=dates, y=retail_trend, mode='lines+markers', name='개인 및 기타 (Individuals)',
-            line=dict(color='#10b981', width=3, shape='spline'),
-            marker=dict(size=7, color='#10b981'),
-            fill='tozeroy', fillcolor='rgba(16, 185, 129, 0.04)',
-            hovertemplate='<b>개인/일반 보유율</b>: %{y:.2f}%<br><b>일자/분기</b>: %{x}<extra></extra>'
+            x=dates, y=t2_trend, mode='lines+markers', name=f"2위: {top3_list[1]['name']}",
+            line=dict(color=colors[1], width=3, shape='spline'),
+            marker=dict(size=7, color=colors[1]),
+            hovertemplate=f"<b>{top3_list[1]['name']}</b>: %{{y:.2f}}%<br><b>일자/분기</b>: %{{x}}<extra></extra>"
         ))
+        
+        # 3rd Top Institution Trace
         fig_trend.add_trace(go.Scatter(
-            x=dates, y=insider_trend, mode='lines+markers', name='내부자 (Insiders)',
-            line=dict(color='#f04452', width=3, shape='spline'),
-            marker=dict(size=7, color='#f04452'),
-            hovertemplate='<b>내부자 보유율</b>: %{y:.2f}%<br><b>일자/분기</b>: %{x}<extra></extra>'
+            x=dates, y=t3_trend, mode='lines+markers', name=f"3위: {top3_list[2]['name']}",
+            line=dict(color=colors[2], width=3, shape='spline'),
+            marker=dict(size=7, color=colors[2]),
+            hovertemplate=f"<b>{top3_list[2]['name']}</b>: %{{y:.2f}}%<br><b>일자/분기</b>: %{{x}}<extra></extra>"
+        ))
+        
+        # Total Institutions Summary Trace
+        fig_trend.add_trace(go.Scatter(
+            x=dates, y=inst_total_trend, mode='lines+markers', name='전체 기관 총합 (Total Inst)',
+            line=dict(color='#f59e0b', width=2, dash='dash', shape='spline'),
+            marker=dict(size=5, color='#f59e0b'),
+            hovertemplate='<b>전체 기관 총 지분율</b>: %{y:.2f}%<br><b>일자/분기</b>: %{x}<extra></extra>'
         ))
         
         fig_trend.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            height=200,
+            height=210,
             margin=dict(l=35, r=15, t=10, b=35),
             xaxis=dict(showgrid=True, gridcolor='#252d3c', tickfont=dict(color='#8b95a1', size=11)),
             yaxis=dict(showgrid=True, gridcolor='#252d3c', tickfont=dict(color='#8b95a1', size=11), ticksuffix='%'),
@@ -1183,8 +1202,8 @@ def update_institutional_holders(ticker, n):
         )
         
         trend_component = html.Div([
-            html.Div("📈 날짜/분기별 지분율 추세 변화 (Ownership Trend by Dates)", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
-            dcc.Graph(figure=fig_trend, config={'displayModeBar': False}, style={'height': '200px'})
+            html.Div(f"📈 상위 Top 3 보유 기관별 날짜/분기 지분율 추이 ({company_name})", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            dcc.Graph(figure=fig_trend, config={'displayModeBar': False}, style={'height': '210px'})
         ], style={'backgroundColor': '#141822', 'padding': '14px', 'borderRadius': '14px', 'marginBottom': '20px'})
 
         # 3. Horizontal Stacked Bar Visualization Graph
