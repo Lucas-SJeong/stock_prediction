@@ -1266,14 +1266,14 @@ def update_analyst_opinions(ticker, n):
                 start_p = float(sub['Close'].iloc[0])
                 
                 if any(k in g_grade for k in ['BUY', 'OVERWEIGHT', 'OUTPERFORM', 'STRONG BUY']):
-                    implied_target = start_p * 1.12
-                    is_hit = max_p >= (implied_target * 0.95)
+                    implied_target = start_p * 1.06
+                    is_hit = max_p >= (implied_target * 0.88)
                 elif any(k in g_grade for k in ['SELL', 'UNDERWEIGHT', 'UNDERPERFORM']):
-                    implied_target = start_p * 0.88
-                    is_hit = min_p <= (implied_target * 1.05)
+                    implied_target = start_p * 0.94
+                    is_hit = min_p <= (implied_target * 1.12)
                 else:
-                    # Neutral/Hold: price stays within ±12% range
-                    is_hit = abs(float(sub['Close'].iloc[-1]) - start_p) / start_p <= 0.12
+                    # Neutral/Hold: price stays within ±18% range
+                    is_hit = abs(float(sub['Close'].iloc[-1]) - start_p) / start_p <= 0.18
                     
                 total_evals += 1
                 if is_hit:
