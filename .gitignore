@@ -12,5 +12,9 @@ env/
 # macOS system files
 .DS_Store
 
-# Temporary outputs
-# Dash
+# Temporary outputs & build artifacts
+build/
+dist/
+*.spec
+
+
