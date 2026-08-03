@@ -1173,7 +1173,7 @@ def update_institutional_holders(ticker, n):
             height=200,
             margin=dict(l=35, r=15, t=10, b=35),
             xaxis=dict(showgrid=True, gridcolor='#252d3c', tickfont=dict(color='#8b95a1', size=11)),
-            yaxis=dict(showgrid=True, gridcolor='#252d3c', tickfont=dict(color='#8b95a1', size=11), suffix='%'),
+            yaxis=dict(showgrid=True, gridcolor='#252d3c', tickfont=dict(color='#8b95a1', size=11), ticksuffix='%'),
             legend=dict(
                 font=dict(color='#8b95a1', size=11),
                 orientation='h',
