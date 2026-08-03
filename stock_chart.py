@@ -579,36 +579,122 @@ def update_tech_summary(ticker, timeframe, n):
         else:
             ma_status, ma_color = "혼조세 (횡보/조정)", "#94a3b8"
             
+        # Valuation Metrics
+        try:
+            info = yf.Ticker(ticker).info or {}
+        except Exception:
+            info = {}
+            
+        pe = info.get('trailingPE')
+        f_pe = info.get('forwardPE')
+        pbr = info.get('priceToBook')
+        psr = info.get('priceToSalesTrailing12Months')
+        peg = info.get('pegRatio')
+        ev_ebitda = info.get('enterpriseToEbitda')
+        div_yield = info.get('dividendYield')
+        hi_52 = info.get('fiftyTwoWeekHigh')
+        lo_52 = info.get('fiftyTwoWeekLow')
+        
+        pe_str = f"{pe:.1f}배" if (isinstance(pe, (int, float)) and pe > 0) else "N/A"
+        f_pe_str = f"{f_pe:.1f}배" if (isinstance(f_pe, (int, float)) and f_pe > 0) else "N/A"
+        pbr_str = f"{pbr:.1f}배" if (isinstance(pbr, (int, float)) and pbr > 0) else "N/A"
+        psr_str = f"{psr:.1f}배" if (isinstance(psr, (int, float)) and psr > 0) else "N/A"
+        peg_str = f"{peg:.2f}" if (isinstance(peg, (int, float)) and peg > 0) else "N/A"
+        ev_str = f"{ev_ebitda:.1f}배" if (isinstance(ev_ebitda, (int, float)) and ev_ebitda > 0) else "N/A"
+        
+        if isinstance(div_yield, (int, float)) and div_yield > 0:
+            div_str = f"{div_yield:.2f}%"
+        else:
+            div_str = "무배당"
+            
+        if isinstance(lo_52, (int, float)) and isinstance(hi_52, (int, float)):
+            range_52w = f"${lo_52:,.0f} ~ ${hi_52:,.0f}"
+        else:
+            range_52w = "N/A"
+            
         return html.Div([
             html.Div([
                 html.Span("📈", style={'fontSize': '20px', 'marginRight': '8px'}),
-                html.Span("기술적 지표 요약", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
+                html.Span("기술적 지표 및 밸류에이션 요약", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
                 html.Span(NASDAQ_TOP10.get(ticker, ticker), style={
                     'backgroundColor': '#252d3c', 'color': '#3182f6', 'fontSize': '11px',
                     'fontWeight': '600', 'padding': '3px 8px', 'borderRadius': '10px', 'marginLeft': 'auto'
                 })
             ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '14px'}),
             
+            # Technical Indicators Row
             html.Div([
                 html.Div([
                     html.Div("RSI (14)", style={'fontSize': '12px', 'color': '#8b95a1'}),
                     html.Div(f"{rsi:.1f}", style={'fontSize': '18px', 'fontWeight': '800', 'color': rsi_color}),
-                    html.Div(rsi_status, style={'fontSize': '12px', 'fontWeight': '600', 'color': rsi_color})
-                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px 14px', 'borderRadius': '12px'}),
+                    html.Div(rsi_status, style={'fontSize': '11px', 'fontWeight': '600', 'color': rsi_color})
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px 12px', 'borderRadius': '12px'}),
                 
                 html.Div([
                     html.Div("20일 이동평균", style={'fontSize': '12px', 'color': '#8b95a1'}),
                     html.Div(f"${ma20:,.2f}", style={'fontSize': '18px', 'fontWeight': '800', 'color': '#f2f4f6'}),
                     html.Div("상회" if current_price >= ma20 else "하회", style={
-                        'fontSize': '12px', 'fontWeight': '600', 'color': '#f04452' if current_price >= ma20 else '#3182f6'
+                        'fontSize': '11px', 'fontWeight': '600', 'color': '#f04452' if current_price >= ma20 else '#3182f6'
                     })
-                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px 14px', 'borderRadius': '12px'})
-            ], style={'display': 'flex', 'gap': '10px', 'marginBottom': '12px'}),
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px 12px', 'borderRadius': '12px'})
+            ], style={'display': 'flex', 'gap': '10px', 'marginBottom': '10px'}),
             
             html.Div([
-                html.Span("이동평균 추세: ", style={'fontSize': '12px', 'color': '#8b95a1'}),
-                html.Span(ma_status, style={'fontSize': '13px', 'fontWeight': '700', 'color': ma_color})
-            ])
+                html.Span("이동평균 추세: ", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                html.Span(ma_status, style={'fontSize': '12px', 'fontWeight': '700', 'color': ma_color})
+            ], style={'marginBottom': '14px'}),
+            
+            # Valuation Auxiliary Metrics Grid Header
+            html.Div("📊 주요 밸류에이션 보조 지표 (Valuation Multiples)", style={
+                'fontSize': '13px', 'fontWeight': '700', 'color': '#f2f4f6',
+                'borderTop': '1px solid rgba(255,255,255,0.08)', 'paddingTop': '12px', 'marginBottom': '10px'
+            }),
+            
+            # Valuation Row 1: PER, Forward PER, PBR, PSR
+            html.Div([
+                html.Div([
+                    html.Div("PER (P/E)", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(pe_str, style={'fontSize': '14px', 'fontWeight': '700', 'color': '#3182f6', 'marginTop': '2px'})
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
+                
+                html.Div([
+                    html.Div("Forward P/E", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(f_pe_str, style={'fontSize': '14px', 'fontWeight': '700', 'color': '#10b981', 'marginTop': '2px'})
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
+                
+                html.Div([
+                    html.Div("PBR (P/B)", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(pbr_str, style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f04452', 'marginTop': '2px'})
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
+                
+                html.Div([
+                    html.Div("PSR (P/S)", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(psr_str, style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f59e0b', 'marginTop': '2px'})
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'})
+            ], style={'display': 'flex', 'gap': '8px', 'marginBottom': '8px'}),
+            
+            # Valuation Row 2: PEG, EV/EBITDA, Div Yield, 52W Range
+            html.Div([
+                html.Div([
+                    html.Div("PEG Ratio", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(peg_str, style={'fontSize': '13px', 'fontWeight': '700', 'color': '#e5e8eb', 'marginTop': '2px'})
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
+                
+                html.Div([
+                    html.Div("EV/EBITDA", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(ev_str, style={'fontSize': '13px', 'fontWeight': '700', 'color': '#e5e8eb', 'marginTop': '2px'})
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
+                
+                html.Div([
+                    html.Div("배당수익률", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(div_str, style={'fontSize': '13px', 'fontWeight': '700', 'color': '#10b981', 'marginTop': '2px'})
+                ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
+                
+                html.Div([
+                    html.Div("52주 범위", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div(range_52w, style={'fontSize': '11px', 'fontWeight': '700', 'color': '#e5e8eb', 'marginTop': '4px', 'whiteSpace': 'nowrap'})
+                ], style={'flex': '1.2', 'backgroundColor': '#141822', 'padding': '8px 6px', 'borderRadius': '10px', 'textAlign': 'center'})
+            ], style={'display': 'flex', 'gap': '8px'})
         ])
     except Exception as e:
         return html.Div([
