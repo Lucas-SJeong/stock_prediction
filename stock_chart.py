@@ -1157,7 +1157,7 @@ def update_institutional_holders(ticker, n):
             x=dates, y=retail_trend, mode='lines+markers', name='개인 및 기타 (Individuals)',
             line=dict(color='#10b981', width=3, shape='spline'),
             marker=dict(size=7, color='#10b981'),
-            fill='tonexty', fillcolor='rgba(16, 185, 129, 0.06)',
+            fill='tozeroy', fillcolor='rgba(16, 185, 129, 0.04)',
             hovertemplate='<b>개인/일반 보유율</b>: %{y:.2f}%<br><b>일자/분기</b>: %{x}<extra></extra>'
         ))
         fig_trend.add_trace(go.Scatter(
@@ -1191,17 +1191,17 @@ def update_institutional_holders(ticker, n):
         fig_bar = go.Figure()
         fig_bar.add_trace(go.Bar(
             y=['지분율'], x=[inst_pct], name=f'기관 ({inst_pct:.1f}%)', orientation='h',
-            marker=dict(color='#3182f6', cornerradius=6),
+            marker=dict(color='#3182f6'),
             hovertemplate='<b>기관 지분율</b>: %{x:.2f}%<extra></extra>'
         ))
         fig_bar.add_trace(go.Bar(
             y=['지분율'], x=[retail_pct], name=f'개인 및 기타 ({retail_pct:.1f}%)', orientation='h',
-            marker=dict(color='#10b981', cornerradius=6),
+            marker=dict(color='#10b981'),
             hovertemplate='<b>개인/일반 지분율</b>: %{x:.2f}%<extra></extra>'
         ))
         fig_bar.add_trace(go.Bar(
             y=['지분율'], x=[insider_pct], name=f'내부자 ({insider_pct:.1f}%)', orientation='h',
-            marker=dict(color='#f04452', cornerradius=6),
+            marker=dict(color='#f04452'),
             hovertemplate='<b>내부자 지분율</b>: %{x:.2f}%<extra></extra>'
         ))
         fig_bar.update_layout(
@@ -1341,6 +1341,8 @@ def update_institutional_holders(ticker, n):
         
         return [header, stat_cards, trend_component, bar_component, firm_table, insider_table]
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return html.Div([
             html.Div("🏦 주요 기관 & 개인 보유 현황 및 추세", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
             html.Div(f"보유 현황 데이터를 계산할 수 없습니다: {e}", style={'fontSize': '13px', 'color': '#8b95a1'})
