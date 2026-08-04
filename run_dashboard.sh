@@ -1,3 +1,4 @@
 #!/bin/bash
-echo "Launching NASDAQ AI Stock Dashboard..."
-"C:\Users\kccistc\stock_prediction-1\.venv\Scripts\python.exe" "$(dirname "$0")/stock_chart.py"
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+echo "🚀 Launching NASDAQ AI Stock Prediction Dashboard..."
+python3 "$DIR/stock_chart.py"

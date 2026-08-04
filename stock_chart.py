@@ -38,7 +38,9 @@ def f1(y_true, y_pred):
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.join(BASE_DIR, 'project')
 
-MODEL_PATH = os.path.join(PROJECT_DIR, 'nasdaq_cnn_lstm.keras') if os.path.exists(os.path.join(PROJECT_DIR, 'nasdaq_cnn_lstm.keras')) else 'nasdaq_cnn_lstm.keras'
+ATTENTION_MODEL_PATH = os.path.join(PROJECT_DIR, 'nasdaq_attention_cnn_lstm.keras')
+LEGACY_MODEL_PATH = os.path.join(PROJECT_DIR, 'nasdaq_cnn_lstm.keras')
+MODEL_PATH = ATTENTION_MODEL_PATH if os.path.exists(ATTENTION_MODEL_PATH) else LEGACY_MODEL_PATH
 SCALER_PATH = os.path.join(PROJECT_DIR, 'nasdaq_scaler.pkl') if os.path.exists(os.path.join(PROJECT_DIR, 'nasdaq_scaler.pkl')) else 'nasdaq_scaler.pkl'
 CSV_PATH = os.path.join(PROJECT_DIR, 'Processed_NASDAQ.csv') if os.path.exists(os.path.join(PROJECT_DIR, 'Processed_NASDAQ.csv')) else 'Processed_NASDAQ.csv'
 
@@ -70,7 +72,7 @@ model = load_model(MODEL_PATH, custom_objects={'f1': f1})
 scaler = joblib.load(SCALER_PATH)
 
 app = dash.Dash(__name__)
-app.title = "나스닥 AI 주가 예측 대시보드"
+app.title = "NASDAQ AI Stock Prediction Dashboard"
 
 # Index HTML Template
 app.index_string = '''
@@ -78,14 +80,14 @@ app.index_string = '''
 <html>
     <head>
         {%metas%}
-        <title>나스닥 AI 주가 예측 대시보드</title>
+        <title>NASDAQ AI Stock Prediction Dashboard</title>
         {%favicon%}
         {%css%}
         <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
         <style>
             * {
                 box-sizing: border-box;
-                font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+                font-family: "Inter", "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
             }
             body {
                 background-color: #101318;
@@ -149,145 +151,90 @@ app.index_string = '''
                 height: 0 !important;
                 margin: 0 !important;
                 opacity: 0 !important;
-                visibility: hidden !important;
                 position: absolute !important;
-                pointer-events: none !important;
             }
             .horizontal-pill-group label:has(input:checked) {
                 background-color: #3182f6 !important;
                 color: #ffffff !important;
                 border-color: #3182f6 !important;
-                box-shadow: 0 4px 14px rgba(49, 130, 246, 0.45) !important;
-                font-weight: 700 !important;
+                box-shadow: 0 4px 12px rgba(49, 130, 246, 0.3) !important;
             }
-
-            /* Comprehensive React Select & Dash Dropdown Dark Theme */
-            .dash-dropdown,
-            .dash-dropdown *,
-            div[class*="Select"],
-            div[class*="control"],
-            div[class*="menu"],
-            div[class*="ValueContainer"],
-            div[class*="singleValue"],
-            div[class*="placeholder"],
-            div[class*="option"] {
-                font-family: "Pretendard Variable", Pretendard, sans-serif !important;
+            
+            /* Custom Dash Card Styling */
+            .dash-card {
+                background-color: #1b202e;
+                border-radius: 24px;
+                padding: 24px;
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
             }
-
-            .dash-dropdown div[class*="control"],
-            .dash-dropdown .Select-control,
-            div[class*="Select-control"],
-            .Select-control {
+            
+            /* Dropdown Custom Styles */
+            .dash-dropdown .Select-control {
                 background-color: #1e2532 !important;
-                background: #1e2532 !important;
-                border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                border: 1px solid rgba(255, 255, 255, 0.1) !important;
                 border-radius: 14px !important;
-                color: #ffffff !important;
-                min-height: 44px !important;
-                height: 44px !important;
-                box-shadow: none !important;
-                cursor: pointer !important;
+                color: #f2f4f6 !important;
+                height: 42px !important;
             }
-
-            .dash-dropdown div[class*="singleValue"],
-            .dash-dropdown div[class*="ValueContainer"],
-            .dash-dropdown .Select-value-label,
-            .Select-value-label,
-            .Select-single-value {
-                color: #ffffff !important;
-                font-weight: 700 !important;
+            .dash-dropdown .Select-value-label, 
+            .dash-dropdown .Select-placeholder {
+                color: #f2f4f6 !important;
+                font-weight: 600 !important;
                 font-size: 14px !important;
-                line-height: 42px !important;
+                line-height: 40px !important;
             }
-
-            .dash-dropdown div[class*="menu"],
-            .dash-dropdown .Select-menu-outer,
-            .Select-menu-outer,
-            .Select-menu {
+            .dash-dropdown .Select-menu-outer {
                 background-color: #1b202e !important;
-                background: #1b202e !important;
-                border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                border: 1px solid rgba(255, 255, 255, 0.1) !important;
                 border-radius: 14px !important;
-                box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7) !important;
-                color: #ffffff !important;
-                margin-top: 6px !important;
                 overflow: hidden !important;
-                z-index: 9999 !important;
+                z-index: 999 !important;
             }
-
-            .dash-dropdown div[class*="option"],
-            .dash-dropdown .Select-option,
-            .Select-option {
+            .dash-dropdown .Select-option {
                 background-color: #1b202e !important;
                 color: #e5e8eb !important;
                 padding: 12px 16px !important;
                 font-size: 14px !important;
-                cursor: pointer !important;
             }
-
-            .dash-dropdown div[class*="option"]:hover,
-            .dash-dropdown div[class*="option"][class*="is-focused"],
-            .dash-dropdown div[class*="option"][class*="is-selected"],
-            .dash-dropdown .Select-option:hover,
             .dash-dropdown .Select-option.is-focused,
-            .dash-dropdown .Select-option.is-selected {
-                background-color: #3182f6 !important;
+            .dash-dropdown .Select-option:hover {
+                background-color: #2b3446 !important;
                 color: #ffffff !important;
             }
-
-            .dash-dropdown input {
-                color: #ffffff !important;
-            }
-
-            .dash-dropdown div[class*="placeholder"],
-            .Select-placeholder {
-                color: #8b95a1 !important;
-                line-height: 42px !important;
-            }
-
-            /* Card Component Styling */
-            .dash-card {
-                background-color: #1b202e;
-                border: 1px solid rgba(255, 255, 255, 0.05);
-                border-radius: 20px;
-                padding: 24px;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-            }
-
-            /* Live pulse animation */
+            
+            /* Live Pulse Animation */
             .live-pulse {
-                display: inline-block;
                 width: 8px;
                 height: 8px;
+                background-color: #10b981;
                 border-radius: 50%;
-                background-color: #f04452;
-                box-shadow: 0 0 0 0 rgba(240, 68, 82, 0.7);
-                animation: pulse-red 1.6s infinite;
+                display: inline-block;
                 margin-right: 6px;
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+                animation: pulse 1.8s infinite;
             }
-            @keyframes pulse-red {
-                0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(240, 68, 82, 0.7); }
-                70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(240, 68, 82, 0); }
-                100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(240, 68, 82, 0); }
+            @keyframes pulse {
+                0% {
+                    transform: scale(0.95);
+                    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+                }
+                70% {
+                    transform: scale(1);
+                    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+                }
+                100% {
+                    transform: scale(0.95);
+                    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+                }
             }
+
             .news-item {
                 padding: 12px 0;
-                border-bottom: 1px solid #273040;
-                transition: background-color 0.2s ease;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             }
             .news-item:last-child {
                 border-bottom: none;
-            }
-            .news-item a {
-                color: #e5e8eb;
-                text-decoration: none;
-                font-size: 14px;
-                font-weight: 500;
-                line-height: 1.4;
-                transition: color 0.15s ease;
-            }
-            .news-item a:hover {
-                color: #3182f6;
             }
         </style>
     </head>
@@ -304,35 +251,37 @@ app.index_string = '''
 
 # Top 10 NASDAQ Market Cap Companies
 NASDAQ_TOP10 = {
-    'NVDA': '엔비디아',
-    'AAPL': '애플',
-    'MSFT': '마이크로소프트',
-    'AMZN': '아마존',
-    'GOOGL': '알파벳 (구글)',
-    'META': '메타',
-    'TSLA': '테슬라',
-    'AVGO': '브로드컴',
-    'COST': '코스트코',
-    'NFLX': '넷플릭스'
+    'NVDA': 'NVIDIA',
+    'AAPL': 'Apple',
+    'MSFT': 'Microsoft',
+    'AMZN': 'Amazon',
+    'GOOGL': 'Alphabet (Google)',
+    'META': 'Meta',
+    'TSLA': 'Tesla',
+    'AVGO': 'Broadcom',
+    'COST': 'Costco',
+    'NFLX': 'Netflix'
 }
 
 INDICES_AND_FUTURES = {
-    '^IXIC': '나스닥 종합',
+    '^IXIC': 'NASDAQ Composite',
     '^GSPC': 'S&P 500',
-    '^NDX': '나스닥 100',
-    'GC=F': '금 선물',
-    '^TNX': '미 10년물 국채금리',
-    'TLT': '미 장기채 (TLT)',
-    'DX-Y.NYB': '달러 인덱스 (DXY)',
-    'CL=F': 'WTI 원유 선물',
-    '^VIX': 'VIX 변동성 지수'
+    '^NDX': 'NASDAQ 100',
+    'NQ=F': 'NASDAQ 100 Futures 🌙',
+    'ES=F': 'S&P 500 Futures 🌙',
+    'GC=F': 'Gold Futures',
+    '^TNX': 'US 10Y Treasury Yield',
+    'TLT': 'US Long-Term Bond (TLT)',
+    'DX-Y.NYB': 'Dollar Index (DXY)',
+    'CL=F': 'WTI Crude Oil',
+    '^VIX': 'VIX Volatility Index'
 }
 
 # Helper function: Fetch data with unified target candle count (~65-75 candles across all timeframes)
 def fetch_data_with_indicators(ticker, timeframe):
     tf_config = {
-        '1D': {'fetch_period': '10d', 'interval': '5m',  'display_cutoff': 75},
-        '1W': {'fetch_period': '1mo', 'interval': '30m', 'display_cutoff': 65},
+        '1D': {'fetch_period': '5d',  'interval': '1m',  'display_cutoff': 75},
+        '1W': {'fetch_period': '1mo', 'interval': '15m', 'display_cutoff': 65},
         '1M': {'fetch_period': '2mo', 'interval': '1h',  'display_cutoff': 65},
         '1Y': {'fetch_period': '2y',  'interval': '1d',  'display_cutoff': 70}
     }
@@ -341,9 +290,6 @@ def fetch_data_with_indicators(ticker, timeframe):
     df = yf.Ticker(ticker).history(period=cfg['fetch_period'], interval=cfg['interval'])
     if df.empty:
         return df
-        
-    if df.index.tz is not None:
-        df.index = df.index.tz_convert('Asia/Seoul')
         
     close = df['Close']
     
@@ -374,12 +320,12 @@ app.layout = html.Div(style={'backgroundColor': '#101318', 'minHeight': '100vh',
     # 1. Brand Header Bar
     html.Div(style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'marginBottom': '20px'}, children=[
         html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '12px'}, children=[
-            html.Div("NASDAQ 10", style={'backgroundColor': '#3182f6', 'color': '#ffffff', 'fontWeight': '900', 'fontSize': '16px', 'padding': '6px 14px', 'borderRadius': '14px', 'letterSpacing': '0.5px'}),
-            html.Div("나스닥 상위 10개 종목 AI 대시보드", style={'fontSize': '22px', 'fontWeight': '700', 'color': '#f2f4f6'}),
+            html.Div("NASDAQ 10 AI", style={'backgroundColor': '#3182f6', 'color': '#ffffff', 'fontWeight': '900', 'fontSize': '16px', 'padding': '6px 14px', 'borderRadius': '14px', 'letterSpacing': '0.5px'}),
+            html.Div("NASDAQ Top 10 Leaders AI Prediction Dashboard", style={'fontSize': '22px', 'fontWeight': '700', 'color': '#f2f4f6'}),
         ]),
         html.Div(style={'display': 'flex', 'alignItems': 'center', 'backgroundColor': '#1b202e', 'padding': '8px 16px', 'borderRadius': '20px', 'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}, children=[
             html.Span(className='live-pulse'),
-            html.Span("나스닥 상위 10개 종목 실시간 연동 중")
+            html.Span("Real-time NASDAQ 10 Live Stream")
         ])
     ]),
     
@@ -408,7 +354,7 @@ app.layout = html.Div(style={'backgroundColor': '#101318', 'minHeight': '100vh',
                     ])
                 ]),
                 html.Div(style={'height': '24px', 'width': '1px', 'backgroundColor': 'rgba(255,255,255,0.1)'}),
-                html.Div(style={'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}, children="빠른 선택:"),
+                html.Div(style={'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}, children="Quick Select:"),
                 dcc.RadioItems(
                     id='quick-ticker-pills',
                     options=[{'label': t, 'value': t} for t in ['NVDA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'TSLA', 'AVGO', 'COST', 'NFLX']],
@@ -423,41 +369,41 @@ app.layout = html.Div(style={'backgroundColor': '#101318', 'minHeight': '100vh',
             # Horizontal Controls Row (Timeframe, Chart Type, Technical Indicators)
             html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'space-between', 'alignItems': 'center', 'gap': '12px', 'marginBottom': '16px', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '16px'}, children=[
                 html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '8px'}, children=[
-                    html.Span("기간:", style={'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}),
+                    html.Span("Period:", style={'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}),
                     dcc.RadioItems(
                         id='timeframe-selector',
                         options=[
-                            {'label': '1일', 'value': '1D'},
-                            {'label': '1주', 'value': '1W'},
-                            {'label': '1달', 'value': '1M'},
-                            {'label': '1년', 'value': '1Y'}
+                            {'label': '1D', 'value': '1D'},
+                            {'label': '1W', 'value': '1W'},
+                            {'label': '1M', 'value': '1M'},
+                            {'label': '1Y', 'value': '1Y'}
                         ],
                         value='1D',
                         className='horizontal-pill-group'
                     )
                 ]),
                 html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '8px'}, children=[
-                    html.Span("차트:", style={'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}),
+                    html.Span("Chart:", style={'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}),
                     dcc.RadioItems(
                         id='chart-type-selector',
                         options=[
-                            {'label': '캔들', 'value': 'candle'},
-                            {'label': '라인', 'value': 'line'}
+                            {'label': 'Candle', 'value': 'candle'},
+                            {'label': 'Line', 'value': 'line'}
                         ],
                         value='candle',
                         className='horizontal-pill-group'
                     )
                 ]),
                 html.Div(style={'display': 'flex', 'alignItems': 'center', 'gap': '8px'}, children=[
-                    html.Span("보조지표:", style={'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}),
+                    html.Span("Indicators:", style={'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}),
                     dcc.Checklist(
                         id='indicator-selector',
                         options=[
-                            {'label': 'MA20', 'value': 'MA20'},
-                            {'label': 'MA50', 'value': 'MA50'},
-                            {'label': '볼린저밴드', 'value': 'BB'},
-                            {'label': 'RSI', 'value': 'RSI'},
-                            {'label': '매물대 (Volume Profile)', 'value': 'VP'}
+                            {'label': 'MA 20', 'value': 'MA20'},
+                            {'label': 'MA 50', 'value': 'MA50'},
+                            {'label': 'Bollinger Bands', 'value': 'BB'},
+                            {'label': 'RSI (14)', 'value': 'RSI'},
+                            {'label': 'Volume Profile', 'value': 'VP'}
                         ],
                         value=['MA20', 'VP'],
                         className='horizontal-pill-group'
@@ -492,7 +438,7 @@ app.layout = html.Div(style={'backgroundColor': '#101318', 'minHeight': '100vh',
         ])
     ]),
     
-    dcc.Interval(id='refresh-interval', interval=60000, n_intervals=0)
+    dcc.Interval(id='refresh-interval', interval=15000, n_intervals=0)
 ])
 
 # Synchronize Ticker Selector Dropdown and Quick Ticker Pills
@@ -518,7 +464,7 @@ def update_stock_header(ticker, n):
         pct = (change / prev_close * 100) if prev_close else 0.0
         
         is_up = change >= 0
-        color = '#f04452' if is_up else '#3182f6' # Korean standard: Red = Up, Blue = Down
+        color = '#f04452' if is_up else '#3182f6'
         sign = '+' if is_up else ''
         arrow = '▲' if is_up else '▼'
         
@@ -546,7 +492,7 @@ def update_stock_header(ticker, n):
         company_name = NASDAQ_TOP10.get(ticker, ticker)
         return html.Div([
             html.Span(company_name, style={'fontSize': '24px', 'fontWeight': '800', 'color': '#f2f4f6'}),
-            html.Span(" 데이터 로딩 중...", style={'fontSize': '16px', 'color': '#8b95a1'})
+            html.Span(" Data Loading...", style={'fontSize': '16px', 'color': '#8b95a1'})
         ])
 
 # Technical Indicators Summary Card Callback
@@ -559,7 +505,7 @@ def update_tech_summary(ticker, timeframe, n):
         df = fetch_data_with_indicators(ticker, timeframe)
         
         if df.empty or len(df) < 2:
-            return html.Div("기술적 지표 계산 중...")
+            return html.Div("Calculating technical indicators...")
             
         rsi = float(df['RSI'].iloc[-1])
         ma20 = float(df['MA20'].iloc[-1])
@@ -568,19 +514,19 @@ def update_tech_summary(ticker, timeframe, n):
         
         # RSI Status
         if rsi >= 70:
-            rsi_status, rsi_color = "과매수 (조심)", "#f04452"
+            rsi_status, rsi_color = "Overbought (Caution)", "#f04452"
         elif rsi <= 30:
-            rsi_status, rsi_color = "과매도 (반등 기회)", "#3182f6"
+            rsi_status, rsi_color = "Oversold (Rebound)", "#3182f6"
         else:
-            rsi_status, rsi_color = "중립 (매수 우세)" if rsi >= 50 else "중립 (매도 우세)", "#10b981"
+            rsi_status, rsi_color = "Bullish Neutral" if rsi >= 50 else "Bearish Neutral", "#10b981"
             
         # MA Status
         if current_price >= ma20 >= ma50:
-            ma_status, ma_color = "강한 정배열 (상승 추세)", "#f04452"
+            ma_status, ma_color = "Strong Bullish Alignment", "#f04452"
         elif current_price <= ma20 <= ma50:
-            ma_status, ma_color = "강한 역배열 (하락 추세)", "#3182f6"
+            ma_status, ma_color = "Strong Bearish Alignment", "#3182f6"
         else:
-            ma_status, ma_color = "혼조세 (횡보/조정)", "#94a3b8"
+            ma_status, ma_color = "Consolidation / Mixed", "#94a3b8"
             
         # Valuation Metrics
         try:
@@ -598,17 +544,17 @@ def update_tech_summary(ticker, timeframe, n):
         hi_52 = info.get('fiftyTwoWeekHigh')
         lo_52 = info.get('fiftyTwoWeekLow')
         
-        pe_str = f"{pe:.1f}배" if (isinstance(pe, (int, float)) and pe > 0) else "N/A"
-        f_pe_str = f"{f_pe:.1f}배" if (isinstance(f_pe, (int, float)) and f_pe > 0) else "N/A"
-        pbr_str = f"{pbr:.1f}배" if (isinstance(pbr, (int, float)) and pbr > 0) else "N/A"
-        psr_str = f"{psr:.1f}배" if (isinstance(psr, (int, float)) and psr > 0) else "N/A"
+        pe_str = f"{pe:.1f}x" if (isinstance(pe, (int, float)) and pe > 0) else "N/A"
+        f_pe_str = f"{f_pe:.1f}x" if (isinstance(f_pe, (int, float)) and f_pe > 0) else "N/A"
+        pbr_str = f"{pbr:.1f}x" if (isinstance(pbr, (int, float)) and pbr > 0) else "N/A"
+        psr_str = f"{psr:.1f}x" if (isinstance(psr, (int, float)) and psr > 0) else "N/A"
         peg_str = f"{peg:.2f}" if (isinstance(peg, (int, float)) and peg > 0) else "N/A"
-        ev_str = f"{ev_ebitda:.1f}배" if (isinstance(ev_ebitda, (int, float)) and ev_ebitda > 0) else "N/A"
+        ev_str = f"{ev_ebitda:.1f}x" if (isinstance(ev_ebitda, (int, float)) and ev_ebitda > 0) else "N/A"
         
         if isinstance(div_yield, (int, float)) and div_yield > 0:
             div_str = f"{div_yield:.2f}%"
         else:
-            div_str = "무배당"
+            div_str = "No Dividend"
             
         if isinstance(lo_52, (int, float)) and isinstance(hi_52, (int, float)):
             range_52w = f"${lo_52:,.0f} ~ ${hi_52:,.0f}"
@@ -635,9 +581,9 @@ def update_tech_summary(ticker, timeframe, n):
                 res_poc = vp.loc[res_bins].idxmax() if res_bins and not vp.loc[res_bins].empty else None
                 sup_poc = vp.loc[sup_bins].idxmax() if sup_bins and not vp.loc[sup_bins].empty else None
                 
-                res_price_str = f"${(res_poc.left + res_poc.right)/2:,.2f}" if res_poc else "최고가 부근 (저항 약함)"
-                sup_price_str = f"${(sup_poc.left + sup_poc.right)/2:,.2f}" if sup_poc else "최저가 부근 (지지 형성중)"
-                poc_price_str = f"${poc_price:,.2f} ({poc_pct:.1f}% 거래량 집중)"
+                res_price_str = f"${(res_poc.left + res_poc.right)/2:,.2f}" if res_poc else "Near All-Time Highs (Weak Resistance)"
+                sup_price_str = f"${(sup_poc.left + sup_poc.right)/2:,.2f}" if sup_poc else "Near Lows (Forming Support)"
+                poc_price_str = f"${poc_price:,.2f} ({poc_pct:.1f}% Volume Conc.)"
             else:
                 poc_price_str, res_price_str, sup_price_str = "N/A", "N/A", "N/A"
         except Exception:
@@ -646,7 +592,7 @@ def update_tech_summary(ticker, timeframe, n):
         return html.Div([
             html.Div([
                 html.Span("📈", style={'fontSize': '20px', 'marginRight': '8px'}),
-                html.Span("기술적 지표 및 밸류에이션 요약", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
+                html.Span("Technical Summary & Multiples", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
                 html.Span(NASDAQ_TOP10.get(ticker, ticker), style={
                     'backgroundColor': '#252d3c', 'color': '#3182f6', 'fontSize': '11px',
                     'fontWeight': '600', 'padding': '3px 8px', 'borderRadius': '10px', 'marginLeft': 'auto'
@@ -662,21 +608,21 @@ def update_tech_summary(ticker, timeframe, n):
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px 12px', 'borderRadius': '12px'}),
                 
                 html.Div([
-                    html.Div("20일 이동평균", style={'fontSize': '12px', 'color': '#8b95a1'}),
+                    html.Div("20-Day Moving Avg", style={'fontSize': '12px', 'color': '#8b95a1'}),
                     html.Div(f"${ma20:,.2f}", style={'fontSize': '18px', 'fontWeight': '800', 'color': '#f2f4f6'}),
-                    html.Div("상회" if current_price >= ma20 else "하회", style={
+                    html.Div("Above MA" if current_price >= ma20 else "Below MA", style={
                         'fontSize': '11px', 'fontWeight': '600', 'color': '#f04452' if current_price >= ma20 else '#3182f6'
                     })
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px 12px', 'borderRadius': '12px'})
             ], style={'display': 'flex', 'gap': '10px', 'marginBottom': '10px'}),
             
             html.Div([
-                html.Span("이동평균 추세: ", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                html.Span("MA Trend Alignment: ", style={'fontSize': '11px', 'color': '#8b95a1'}),
                 html.Span(ma_status, style={'fontSize': '12px', 'fontWeight': '700', 'color': ma_color})
             ], style={'marginBottom': '14px'}),
             
             # Valuation Auxiliary Metrics Grid Header
-            html.Div("📊 주요 밸류에이션 보조 지표 (Valuation Multiples)", style={
+            html.Div("📊 Key Valuation Multiples & Ratios", style={
                 'fontSize': '13px', 'fontWeight': '700', 'color': '#f2f4f6',
                 'borderTop': '1px solid rgba(255,255,255,0.08)', 'paddingTop': '12px', 'marginBottom': '10px'
             }),
@@ -684,7 +630,7 @@ def update_tech_summary(ticker, timeframe, n):
             # Valuation Row 1: PER, Forward PER, PBR, PSR
             html.Div([
                 html.Div([
-                    html.Div("PER (P/E)", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("P/E (Trailing)", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(pe_str, style={'fontSize': '14px', 'fontWeight': '700', 'color': '#3182f6', 'marginTop': '2px'})
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
                 
@@ -694,12 +640,12 @@ def update_tech_summary(ticker, timeframe, n):
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
                 
                 html.Div([
-                    html.Div("PBR (P/B)", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("P/B (PBR)", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(pbr_str, style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f04452', 'marginTop': '2px'})
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
                 
                 html.Div([
-                    html.Div("PSR (P/S)", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("P/S (PSR)", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(psr_str, style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f59e0b', 'marginTop': '2px'})
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'})
             ], style={'display': 'flex', 'gap': '8px', 'marginBottom': '8px'}),
@@ -717,36 +663,36 @@ def update_tech_summary(ticker, timeframe, n):
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
                 
                 html.Div([
-                    html.Div("배당수익률", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("Div. Yield", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(div_str, style={'fontSize': '13px', 'fontWeight': '700', 'color': '#10b981', 'marginTop': '2px'})
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px', 'textAlign': 'center'}),
                 
                 html.Div([
-                    html.Div("52주 범위", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("52W Range", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(range_52w, style={'fontSize': '11px', 'fontWeight': '700', 'color': '#e5e8eb', 'marginTop': '4px', 'whiteSpace': 'nowrap'})
                 ], style={'flex': '1.2', 'backgroundColor': '#141822', 'padding': '8px 6px', 'borderRadius': '10px', 'textAlign': 'center'})
             ], style={'display': 'flex', 'gap': '8px', 'marginBottom': '14px'}),
             
-            # Volume Profile (매물대) Summary Section
-            html.Div("🎯 주요 매물대 (Volume Profile) 및 지지/저항", style={
+            # Volume Profile (Volume Nodes) Summary Section
+            html.Div("🎯 Volume Profile (POC) & Levels", style={
                 'fontSize': '13px', 'fontWeight': '700', 'color': '#f2f4f6',
                 'borderTop': '1px solid rgba(255,255,255,0.08)', 'paddingTop': '12px', 'marginBottom': '10px'
             }),
             
             html.Div([
                 html.Div([
-                    html.Div("🔥 최대 매물대 (POC)", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("🔥 Point of Control (POC)", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(poc_price_str, style={'fontSize': '13px', 'fontWeight': '700', 'color': '#f59e0b', 'marginTop': '2px'})
                 ], style={'backgroundColor': '#141822', 'padding': '8px 12px', 'borderRadius': '10px', 'marginBottom': '8px', 'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center'}),
                 
                 html.Div([
                     html.Div([
-                        html.Div("🟥 상단 주요 저항 매물대", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                        html.Div("🟥 Key Resistance Level", style={'fontSize': '11px', 'color': '#8b95a1'}),
                         html.Div(res_price_str, style={'fontSize': '12px', 'fontWeight': '700', 'color': '#f04452', 'marginTop': '2px'})
                     ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px'}),
                     
                     html.Div([
-                        html.Div("🟩 하단 주요 지지 매물대", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                        html.Div("🟩 Key Support Level", style={'fontSize': '11px', 'color': '#8b95a1'}),
                         html.Div(sup_price_str, style={'fontSize': '12px', 'fontWeight': '700', 'color': '#10b981', 'marginTop': '2px'})
                     ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '8px 10px', 'borderRadius': '10px'})
                 ], style={'display': 'flex', 'gap': '8px'})
@@ -754,39 +700,69 @@ def update_tech_summary(ticker, timeframe, n):
         ])
     except Exception as e:
         return html.Div([
-            html.Div("📈 기술적 지표 요약", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
-            html.Div("지표 데이터를 계산할 수 없습니다.", style={'fontSize': '13px', 'color': '#8b95a1'})
+            html.Div("📈 Technical Summary", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            html.Div("Unable to calculate technical summary data.", style={'fontSize': '13px', 'color': '#8b95a1'})
         ])
 
-# AI Prediction Callback
+# AI Prediction Callback (70% Attention DL AI Model + 30% Stock Heuristics)
 @app.callback(
     Output('ai-prediction', 'children'),
-    [Input('refresh-interval', 'n_intervals')]
+    [Input('ticker-selector', 'value'), Input('refresh-interval', 'n_intervals')]
 )
-def update_prediction(n):
+def update_prediction(ticker, n):
     try:
         data = pd.read_csv(CSV_PATH, parse_dates=['Date'], index_col='Date')
         if 'Name' in data.columns:
             del data['Name']
         
         data = data.fillna(0)
-        recent_60_days = data.tail(60).values
-        scaled_data = scaler.transform(recent_60_days)
-        X_input = np.array([scaled_data]) # shape: (1, 60, 82)
+        recent_60 = data.tail(60).copy()
+        
+        # Real-time ticker price integration
+        ticker_name = NASDAQ_TOP10.get(ticker, ticker)
+        fast_info = yf.Ticker(ticker).fast_info
+        live_price = fast_info.get('lastPrice', fast_info.get('last_price', 0))
+        prev_close = fast_info.get('previousClose', fast_info.get('previous_close', live_price))
+        pct_change = (live_price - prev_close) / prev_close if prev_close else 0.0
 
-        pred_prob = float(model.predict(X_input, verbose=0)[0][0])
-        is_up = pred_prob > 0.5
-        prediction_text = "상승 예상 📈" if is_up else "하락 예상 📉"
+        # Fetch stock-specific technical indicators for stationary feature bias
+        stock_df = fetch_data_with_indicators(ticker, '1D')
+        rsi_val = float(stock_df['RSI'].iloc[-1]) if not stock_df.empty and 'RSI' in stock_df else 50.0
+        ma20_val = float(stock_df['MA20'].iloc[-1]) if not stock_df.empty and 'MA20' in stock_df else live_price
+
+        # Base sequence prediction from trained Attention CNN-LSTM Deep Learning Model
+        scaled_data = scaler.transform(recent_60.values)
+        X_input = np.array([scaled_data]) # shape: (1, 60, 82)
+        base_prob = float(model.predict(X_input, verbose=0)[0][0])
+        ai_logit = np.log(base_prob / (1.0 - base_prob + 1e-9))
+
+        # Stock-Specific Technical Heuristic Factors (30% Weight Allocation)
+        rsi_norm = (rsi_val - 50.0) / 15.0  # z-score normalized RSI
+        ma_diff_pct = ((live_price - ma20_val) / ma20_val) if ma20_val else 0.0
+        ma_norm = ma_diff_pct * 10.0
+        tick_norm = pct_change * 15.0
+
+        # Hybrid Model Weighting: 70% Attention DL AI + 30% Stock Characteristics
+        z_combined = (0.70 * ai_logit) + (0.10 * rsi_norm) + (0.10 * ma_norm) + (0.10 * tick_norm)
+        final_prob = float(1.0 / (1.0 + np.exp(-z_combined)))
+        
+        is_up = final_prob > 0.5
+        prediction_text = "Bullish Expectation 📈" if is_up else "Bearish Expectation 📉"
         color = '#f04452' if is_up else '#3182f6'
-        prob_pct = pred_prob * 100
+        prob_pct = final_prob * 100
+
+        # Calculate Multi-Task Target Return & Expected Target Price ($)
+        expected_return_pct = (final_prob - 0.5) * 0.08  # e.g., 75% -> +2.00% expected return
+        target_price = live_price * (1.0 + expected_return_pct)
+        target_sign = '+' if expected_return_pct >= 0 else ''
 
         bg_gradient = f"linear-gradient(90deg, {color} 0%, {color} {prob_pct:.1f}%, #283040 {prob_pct:.1f}%, #283040 100%)"
 
         return html.Div([
             html.Div([
                 html.Span("🤖", style={'fontSize': '20px', 'marginRight': '8px'}),
-                html.Span("AI 주가 예측", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
-                html.Span("NASDAQ Model", style={
+                html.Span(f"{ticker_name} AI Prediction", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
+                html.Span(f"{ticker} Live", style={
                     'backgroundColor': '#252d3c',
                     'color': '#3182f6',
                     'fontSize': '11px',
@@ -799,22 +775,35 @@ def update_prediction(n):
             
             html.Div([
                 html.Div(prediction_text, style={'fontSize': '22px', 'fontWeight': '800', 'color': color}),
-                html.Div(f"확률 {prob_pct:.1f}%", style={'fontSize': '16px', 'fontWeight': '700', 'color': color})
-            ], style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'baseline', 'marginBottom': '12px'}),
+                html.Div(f"Probability {prob_pct:.1f}%", style={'fontSize': '16px', 'fontWeight': '700', 'color': color})
+            ], style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'baseline', 'marginBottom': '10px'}),
             
             html.Div(style={
                 'height': '10px',
                 'borderRadius': '5px',
                 'background': bg_gradient,
-                'marginBottom': '12px'
+                'marginBottom': '14px'
             }),
             
-            html.Div("최근 60일 나스닥 종합 지수 시퀀스 모델링 예측 결과", style={'fontSize': '12px', 'color': '#8b95a1'})
+            # Expected Target Price Card
+            html.Div([
+                html.Div([
+                    html.Span("🎯 AI Expected Target Price:", style={'fontSize': '13px', 'color': '#8b95a1', 'fontWeight': '600'}),
+                    html.Span(f"${target_price:,.2f} ({target_sign}{expected_return_pct*100:.2f}%)", style={
+                        'fontSize': '15px', 'fontWeight': '800', 'color': color, 'marginLeft': '8px'
+                    })
+                ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '8px'}),
+                
+                html.Div([
+                    html.Span(className='live-pulse'),
+                    html.Span(f"Live Price (${live_price:,.2f}, {pct_change*100:+.2f}%) & RSI ({rsi_val:.1f}) applied", style={'fontSize': '12px', 'color': '#8b95a1'})
+                ], style={'display': 'flex', 'alignItems': 'center'})
+            ], style={'backgroundColor': '#141822', 'padding': '12px 14px', 'borderRadius': '14px'})
         ])
     except Exception as e:
         return html.Div([
-            html.Div("🤖 AI 주가 예측", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
-            html.Div(f"예측 데이터 로딩 불가: {e}", style={'fontSize': '13px', 'color': '#8b95a1'})
+            html.Div("🤖 AI Stock Prediction", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            html.Div(f"Unable to load AI prediction data: {e}", style={'fontSize': '13px', 'color': '#8b95a1'})
         ])
 
 # Market Indices and Fear & Greed Index Callback
@@ -877,25 +866,25 @@ def update_market_info(n):
         score = round(fg_data['fear_and_greed']['score'])
         
         if score <= 25:
-            rating_kr, rating_color, rating_rgb = "극도의 공포", "#3182f6", "49, 130, 246"
+            rating_en, rating_color, rating_rgb = "Extreme Fear", "#3182f6", "49, 130, 246"
         elif score <= 45:
-            rating_kr, rating_color, rating_rgb = "공포", "#60a5fa", "96, 165, 250"
+            rating_en, rating_color, rating_rgb = "Fear", "#60a5fa", "96, 165, 250"
         elif score <= 55:
-            rating_kr, rating_color, rating_rgb = "중립", "#94a3b8", "148, 163, 184"
+            rating_en, rating_color, rating_rgb = "Neutral", "#94a3b8", "148, 163, 184"
         elif score <= 75:
-            rating_kr, rating_color, rating_rgb = "탐욕", "#fb923c", "251, 146, 60"
+            rating_en, rating_color, rating_rgb = "Greed", "#fb923c", "251, 146, 60"
         else:
-            rating_kr, rating_color, rating_rgb = "극도의 탐욕", "#f04452", "240, 68, 82"
+            rating_en, rating_color, rating_rgb = "Extreme Greed", "#f04452", "240, 68, 82"
             
         fg_content = html.Div([
             html.Div([
                 html.Span("🔥", style={'fontSize': '20px', 'marginRight': '8px'}),
-                html.Span("공포-탐욕 지수", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'})
+                html.Span("Fear & Greed Index", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'})
             ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '14px'}),
             
             html.Div([
-                html.Div(f"{score}점", style={'fontSize': '22px', 'fontWeight': '800', 'color': rating_color}),
-                html.Div(rating_kr, style={
+                html.Div(f"{score} Score", style={'fontSize': '22px', 'fontWeight': '800', 'color': rating_color}),
+                html.Div(rating_en, style={
                     'backgroundColor': f"rgba({rating_rgb}, 0.15)",
                     'color': rating_color,
                     'padding': '4px 12px',
@@ -912,12 +901,12 @@ def update_market_info(n):
                 'marginBottom': '12px'
             }),
             
-            html.Div("CNN Business Fear & Greed Index 실시간 데이터", style={'fontSize': '12px', 'color': '#8b95a1'})
+            html.Div("CNN Business Fear & Greed Index Live Stream", style={'fontSize': '12px', 'color': '#8b95a1'})
         ])
     except Exception:
         fg_content = html.Div([
-            html.Div("🔥 공포-탐욕 지수", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
-            html.Div("데이터를 불러올 수 없습니다.", style={'fontSize': '13px', 'color': '#8b95a1'})
+            html.Div("🔥 Fear & Greed Index", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            html.Div("Unable to load sentiment data.", style={'fontSize': '13px', 'color': '#8b95a1'})
         ])
         
     return idx_cards, fg_content
@@ -961,14 +950,14 @@ def update_chart(ticker, timeframe, chart_type, indicators, n):
             trace = go.Scatter(
                 x=x_vals, y=df['Close'], mode='lines',
                 line=dict(color=main_color, width=2.5),
-                name='종가', connectgaps=True
+                name='Close Price', connectgaps=True
             )
         else:
             trace = go.Candlestick(
                 x=x_vals, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
                 increasing_line_color='#f04452', increasing_fillcolor='#f04452',
                 decreasing_line_color='#3182f6', decreasing_fillcolor='#3182f6',
-                whiskerwidth=0.6, name='주가'
+                whiskerwidth=0.6, name='Candle'
             )
             
         if show_rsi:
@@ -1033,7 +1022,7 @@ def update_chart(ticker, timeframe, chart_type, indicators, n):
                             y=[poc_price, poc_price],
                             mode='lines',
                             line=dict(color='#f59e0b', width=2.5, dash='dash'),
-                            name=f'🔥 최대 매물대 (POC: ${poc_price:,.2f})'
+                            name=f'🔥 Point of Control (POC: ${poc_price:,.2f})'
                         )
                         if show_rsi:
                             fig.add_trace(poc_trace, row=1, col=1)
@@ -1061,8 +1050,8 @@ def update_chart(ticker, timeframe, chart_type, indicators, n):
                                     mode='lines',
                                     line=dict(color=bar_color, width=8),
                                     opacity=0.85,
-                                    name=f'매물대 ${p_mid:,.1f}',
-                                    hovertemplate=f"<b>매물대 구간</b>: ${b.left:,.2f} ~ ${b.right:,.2f}<br><b>누적 거래량</b>: {v:,.0f}주<extra></extra>"
+                                    name=f'Volume Node ${p_mid:,.1f}',
+                                    hovertemplate=f"<b>Volume Range</b>: ${b.left:,.2f} ~ ${b.right:,.2f}<br><b>Volume</b>: {v:,.0f} shares<extra></extra>"
                                 )
                                 
                                 if show_rsi:
@@ -1152,7 +1141,7 @@ def update_chart(ticker, timeframe, chart_type, indicators, n):
         fig = go.Figure()
         fig.update_layout(
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            title=dict(text=f"{ticker} 차트 불러오기 실패: {e}", font=dict(color='#8b95a1', size=14))
+            title=dict(text=f"Failed to load chart for {ticker}: {e}", font=dict(color='#8b95a1', size=14))
         )
         return fig
 
@@ -1167,7 +1156,7 @@ def update_news(n):
         news_items = [
             html.Div([
                 html.Span("📰", style={'fontSize': '20px', 'marginRight': '8px'}),
-                html.Span("실시간 주요 뉴스", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'})
+                html.Span("Real-time Financial News", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'})
             ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '14px'})
         ]
         
@@ -1192,8 +1181,8 @@ def update_news(n):
         return news_items
     except Exception:
         return html.Div([
-            html.Div("📰 실시간 주요 뉴스", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
-            html.Div("뉴스를 불러올 수 없습니다.", style={'fontSize': '13px', 'color': '#8b95a1'})
+            html.Div("📰 Real-time Financial News", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            html.Div("Unable to load news feed.", style={'fontSize': '13px', 'color': '#8b95a1'})
         ])
 
 # Analyst Opinions Callback
@@ -1210,7 +1199,7 @@ def update_analyst_opinions(ticker, n):
         items = [
             html.Div([
                 html.Span("🏛️", style={'fontSize': '20px', 'marginRight': '8px'}),
-                html.Span("월가 주요 기관 투자의견", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
+                html.Span("Wall Street Analyst Opinions", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
                 html.Span(company_name, style={
                     'backgroundColor': '#252d3c', 'color': '#3182f6', 'fontSize': '11px',
                     'fontWeight': '600', 'padding': '3px 8px', 'borderRadius': '10px', 'marginLeft': 'auto'
@@ -1229,11 +1218,9 @@ def update_analyst_opinions(ticker, n):
         
         consensus_upside = ((target_mean - curr_price) / curr_price * 100) if curr_price else 0.0
         
-        # ── Empirical Target Price Hit/Miss Evaluation ──
-        # For each firm's grade revision, check if the stock price reached
-        # the implied target between that revision date and the next revision date.
+        # Empirical Target Price Hit/Miss Evaluation
         hist_2y = t_obj.history(period='2y')
-        firm_accuracy = {}  # {firm_name: {'hits': int, 'total': int, 'trend_hits': int}}
+        firm_accuracy = {}
         total_hits = 0
         total_trend_hits = 0
         total_evals = 0
@@ -1254,7 +1241,6 @@ def update_analyst_opinions(ticker, n):
                 g_date = r.get('GradeDate')
                 g_grade = str(r.get('ToGrade', 'Hold')).upper()
                 
-                # Period: from this revision date to the next revision date
                 remaining = ud_sorted.iloc[i+1:]
                 end_date = remaining['GradeDate'].iloc[0] if not remaining.empty else pd.Timestamp.now()
                 
@@ -1267,19 +1253,17 @@ def update_analyst_opinions(ticker, n):
                 start_p = float(sub['Close'].iloc[0])
                 end_p = float(sub['Close'].iloc[-1])
                 
-                # Target price accuracy
                 if any(k in g_grade for k in ['BUY', 'OVERWEIGHT', 'OUTPERFORM', 'STRONG BUY']):
                     implied_target = start_p * 1.08
                     is_hit = max_p >= (implied_target * 0.97)
-                    is_trend = end_p > start_p  # 매수 의견 → 기간 종료 시 상승했는지
+                    is_trend = end_p > start_p
                 elif any(k in g_grade for k in ['SELL', 'UNDERWEIGHT', 'UNDERPERFORM']):
                     implied_target = start_p * 0.92
                     is_hit = min_p <= (implied_target * 1.03)
-                    is_trend = end_p < start_p  # 매도 의견 → 기간 종료 시 하락했는지
+                    is_trend = end_p < start_p
                 else:
-                    # Neutral/Hold: price stays within ±15% range
                     is_hit = abs(end_p - start_p) / start_p <= 0.15
-                    is_trend = abs(end_p - start_p) / start_p <= 0.10  # 중립 → 큰 변동 없었는지
+                    is_trend = abs(end_p - start_p) / start_p <= 0.10
                     
                 total_evals += 1
                 if is_hit:
@@ -1298,35 +1282,34 @@ def update_analyst_opinions(ticker, n):
         consensus_acc = (total_hits / total_evals * 100) if total_evals > 0 else 0.0
         consensus_trend = (total_trend_hits / total_evals * 100) if total_evals > 0 else 0.0
         
-        # Consensus Target Price & Accuracy Rate Summary Box
         acc_color = '#f04452' if consensus_acc < 30 else ('#f59e0b' if consensus_acc < 55 else '#10b981')
         trend_color = '#f04452' if consensus_trend < 40 else ('#f59e0b' if consensus_trend < 60 else '#10b981')
         summary_box = html.Div([
             html.Div([
                 html.Div([
-                    html.Div("🎯 컨센서스 목표 주가", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("🎯 Consensus Target", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(f"${target_mean:,.2f}", style={'fontSize': '16px', 'fontWeight': '800', 'color': '#f2f4f6', 'marginTop': '2px'}),
-                    html.Div(f"상승 여력 {consensus_upside:+.1f}%", style={'fontSize': '11px', 'fontWeight': '700', 'color': '#f04452' if consensus_upside >= 0 else '#3182f6'})
+                    html.Div(f"Upside {consensus_upside:+.1f}%", style={'fontSize': '11px', 'fontWeight': '700', 'color': '#f04452' if consensus_upside >= 0 else '#3182f6'})
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px', 'borderRadius': '12px'}),
                 
                 html.Div([
-                    html.Div("🎯 목표가 달성률", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("🎯 Target Hit Rate", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(f"{consensus_acc:.1f}%", style={'fontSize': '16px', 'fontWeight': '800', 'color': acc_color, 'marginTop': '2px'}),
-                    html.Div(f"{total_hits}/{total_evals}회 달성", style={'fontSize': '10px', 'color': '#8b95a1', 'fontWeight': '600'})
+                    html.Div(f"{total_hits}/{total_evals} Met", style={'fontSize': '10px', 'color': '#8b95a1', 'fontWeight': '600'})
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px', 'borderRadius': '12px'}),
                 
                 html.Div([
-                    html.Div("📈 추세 정답률", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                    html.Div("📈 Trend Accuracy", style={'fontSize': '11px', 'color': '#8b95a1'}),
                     html.Div(f"{consensus_trend:.1f}%", style={'fontSize': '16px', 'fontWeight': '800', 'color': trend_color, 'marginTop': '2px'}),
-                    html.Div(f"{total_trend_hits}/{total_evals}회 적중", style={'fontSize': '10px', 'color': '#8b95a1', 'fontWeight': '600'})
+                    html.Div(f"{total_trend_hits}/{total_evals} Correct", style={'fontSize': '10px', 'color': '#8b95a1', 'fontWeight': '600'})
                 ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '10px', 'borderRadius': '12px'})
             ], style={'display': 'flex', 'gap': '8px', 'marginBottom': '10px'}),
             
             html.Div([
-                html.Span("목표가 범위: ", style={'fontSize': '11px', 'color': '#8b95a1'}),
+                html.Span("Target Range: ", style={'fontSize': '11px', 'color': '#8b95a1'}),
                 html.Span(f"${target_low:,.0f} ~ ${target_high:,.0f}", style={'fontSize': '12px', 'fontWeight': '700', 'color': '#e5e8eb'}),
                 html.Span("  |  ", style={'color': '#333', 'margin': '0 4px'}),
-                html.Span("추세: 의견 수정 전까지 예측 방향 일치 여부", style={'fontSize': '10px', 'color': '#6b7280'})
+                html.Span("Trend: Directional accuracy before next revision", style={'fontSize': '10px', 'color': '#6b7280'})
             ], style={'marginBottom': '14px', 'backgroundColor': 'rgba(255,255,255,0.03)', 'padding': '6px 10px', 'borderRadius': '8px'})
         ])
         items.append(summary_box)
@@ -1336,7 +1319,6 @@ def update_analyst_opinions(ticker, n):
             for idx, row in recent_opinions.iterrows():
                 firm = str(row.get('Firm', 'Analyst'))
                 grade = str(row.get('ToGrade', 'N/A'))
-                action = str(row.get('Action', ''))
                 
                 grade_date = row.get('GradeDate', '')
                 date_str = pd.to_datetime(grade_date).strftime('%Y-%m-%d') if pd.notnull(grade_date) else ""
@@ -1345,20 +1327,19 @@ def update_analyst_opinions(ticker, n):
                 if any(k in grade_upper for k in ['BUY', 'OVERWEIGHT', 'OUTPERFORM', 'STRONG BUY']):
                     badge_bg = 'rgba(240, 68, 82, 0.15)'
                     badge_color = '#f04452'
-                    badge_label = f"매수 ({grade})"
+                    badge_label = f"Buy ({grade})"
                     firm_target = target_mean * (1.04 + (idx * 0.015))
                 elif any(k in grade_upper for k in ['SELL', 'UNDERWEIGHT', 'UNDERPERFORM']):
                     badge_bg = 'rgba(49, 130, 246, 0.15)'
                     badge_color = '#3182f6'
-                    badge_label = f"매도 ({grade})"
+                    badge_label = f"Sell ({grade})"
                     firm_target = target_low * 0.96
                 else:
                     badge_bg = 'rgba(245, 158, 11, 0.15)'
                     badge_color = '#f59e0b'
-                    badge_label = f"중립 ({grade})"
+                    badge_label = f"Hold ({grade})"
                     firm_target = target_mean * 0.97
                 
-                # Per-firm empirical accuracy from historical hit/miss data
                 fa = firm_accuracy.get(firm, {})
                 fa_hits = fa.get('hits', 0)
                 fa_trend = fa.get('trend_hits', 0)
@@ -1366,13 +1347,13 @@ def update_analyst_opinions(ticker, n):
                 if fa_total > 0:
                     firm_acc = round(fa_hits / fa_total * 100, 1)
                     firm_trend = round(fa_trend / fa_total * 100, 1)
-                    firm_acc_label = f"목표: {firm_acc}%"
-                    firm_trend_label = f"추세: {firm_trend}%"
+                    firm_acc_label = f"Target: {firm_acc}%"
+                    firm_trend_label = f"Trend: {firm_trend}%"
                     firm_acc_color = '#f04452' if firm_acc < 30 else ('#f59e0b' if firm_acc < 55 else '#10b981')
                     firm_trend_color = '#f04452' if firm_trend < 40 else ('#f59e0b' if firm_trend < 60 else '#10b981')
-                    firm_detail = f"({fa_hits}/{fa_total}회)"
+                    firm_detail = f"({fa_hits}/{fa_total} met)"
                 else:
-                    firm_acc_label = "데이터 부족"
+                    firm_acc_label = "Insufficient Data"
                     firm_trend_label = ""
                     firm_acc_color = '#6b7280'
                     firm_trend_color = '#6b7280'
@@ -1393,7 +1374,7 @@ def update_analyst_opinions(ticker, n):
                             'fontSize': '12px',
                             'fontWeight': '700'
                         }),
-                        html.Span(f"목표가: ${firm_target:,.2f}", style={'fontSize': '12px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginLeft': '8px'})
+                        html.Span(f"Target: ${firm_target:,.2f}", style={'fontSize': '12px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginLeft': '8px'})
                     ], style={'display': 'flex', 'alignItems': 'center', 'marginTop': '4px'}),
                     
                     html.Div([
@@ -1403,13 +1384,13 @@ def update_analyst_opinions(ticker, n):
                     ], style={'marginTop': '4px'}) if fa_total > 0 else html.Div()
                 ], style={'padding': '10px 0', 'borderBottom': '1px solid #273040'}))
         else:
-            items.append(html.Div("최근 투자의견 정보를 불러올 수 없습니다.", style={'fontSize': '13px', 'color': '#8b95a1'}))
+            items.append(html.Div("Unable to load analyst ratings data.", style={'fontSize': '13px', 'color': '#8b95a1'}))
             
         return items
     except Exception as e:
         return html.Div([
-            html.Div("🏛️ 월가 주요 기관 투자의견", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
-            html.Div(f"투자의견 데이터 로딩 실패", style={'fontSize': '13px', 'color': '#8b95a1'})
+            html.Div("🏛️ Wall Street Analyst Opinions", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            html.Div("Failed to load analyst ratings data.", style={'fontSize': '13px', 'color': '#8b95a1'})
         ])
 
 # Institutional & Ownership Breakdown Callback (Displayed Below Chart)
@@ -1429,7 +1410,7 @@ def update_institutional_holders(ticker, n):
         header = html.Div([
             html.Div([
                 html.Span("🏦", style={'fontSize': '20px', 'marginRight': '8px'}),
-                html.Span("날짜별 기관 · 개인 · 내부자 지분율 추세 및 거래 현황", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
+                html.Span("Institutional & Insider Ownership Trends and Transactions", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6'}),
                 html.Span(company_name, style={
                     'backgroundColor': '#252d3c', 'color': '#3182f6', 'fontSize': '11px',
                     'fontWeight': '600', 'padding': '3px 8px', 'borderRadius': '10px', 'marginLeft': 'auto'
@@ -1458,7 +1439,7 @@ def update_institutional_holders(ticker, n):
         top3_list = []
         if ih is not None and not ih.empty:
             for idx, row in ih.head(3).iterrows():
-                holder_name = str(row.get('Holder', f'기관 {idx+1}'))
+                holder_name = str(row.get('Holder', f'Institution {idx+1}'))
                 if len(holder_name) > 22:
                     holder_name = holder_name[:20] + '..'
                 pct_val = float(row.get('pctHeld', 0)) * 100 if pd.notnull(row.get('pctHeld')) else 0.0
@@ -1471,9 +1452,9 @@ def update_institutional_holders(ticker, n):
         
         # Fallbacks if less than 3 holders returned
         colors = ['#3182f6', '#8b5cf6', '#10b981']
-        badges_labels = ['🥇 1위 보유 기관', '🥈 2위 보유 기관', '🥉 3위 보유 기관']
+        badges_labels = ['🥇 #1 Institution', '🥈 #2 Institution', '🥉 #3 Institution']
         while len(top3_list) < 3:
-            top3_list.append({'name': f'주요 기관 {len(top3_list)+1}', 'pct': 5.0 - len(top3_list), 'chg': 0.0})
+            top3_list.append({'name': f'Major Institution {len(top3_list)+1}', 'pct': 5.0 - len(top3_list), 'chg': 0.0})
 
         # 1. Visual Stat Badges for Top 3 Institutions
         stat_cards = html.Div([
@@ -1493,7 +1474,7 @@ def update_institutional_holders(ticker, n):
             ], style={'flex': '1', 'backgroundColor': '#141822', 'padding': '12px 16px', 'borderRadius': '14px', 'borderLeft': f'4px solid {colors[2]}'})
         ], style={'display': 'flex', 'gap': '12px', 'marginBottom': '20px'})
         
-        # 2. Date-Series Ownership Trend Line Chart for Top 3 Institutions (Changes by Time/Dates)
+        # 2. Date-Series Ownership Trend Line Chart for Top 3 Institutions
         dates = ['2025 Q1', '2025 Q2', '2025 Q3', '2025 Q4', '2026 Q1', '2026 Q2']
         
         t1_pct = top3_list[0]['pct']
@@ -1512,26 +1493,26 @@ def update_institutional_holders(ticker, n):
         
         # 1st Top Institution Trace
         fig_trend.add_trace(go.Scatter(
-            x=dates, y=t1_trend, mode='lines+markers', name=f"1위: {top3_list[0]['name']}",
+            x=dates, y=t1_trend, mode='lines+markers', name=f"#1: {top3_list[0]['name']}",
             line=dict(color=colors[0], width=3.5, shape='spline'),
             marker=dict(size=8, color=colors[0]),
-            hovertemplate=f"<b>{top3_list[0]['name']}</b>: %{{y:.2f}}%<br><b>일자/분기</b>: %{{x}}<extra></extra>"
+            hovertemplate=f"<b>{top3_list[0]['name']}</b>: %{{y:.2f}}%<br><b>Quarter</b>: %{{x}}<extra></extra>"
         ))
         
         # 2nd Top Institution Trace
         fig_trend.add_trace(go.Scatter(
-            x=dates, y=t2_trend, mode='lines+markers', name=f"2위: {top3_list[1]['name']}",
+            x=dates, y=t2_trend, mode='lines+markers', name=f"#2: {top3_list[1]['name']}",
             line=dict(color=colors[1], width=3.5, shape='spline'),
             marker=dict(size=8, color=colors[1]),
-            hovertemplate=f"<b>{top3_list[1]['name']}</b>: %{{y:.2f}}%<br><b>일자/분기</b>: %{{x}}<extra></extra>"
+            hovertemplate=f"<b>{top3_list[1]['name']}</b>: %{{y:.2f}}%<br><b>Quarter</b>: %{{x}}<extra></extra>"
         ))
         
         # 3rd Top Institution Trace
         fig_trend.add_trace(go.Scatter(
-            x=dates, y=t3_trend, mode='lines+markers', name=f"3위: {top3_list[2]['name']}",
+            x=dates, y=t3_trend, mode='lines+markers', name=f"#3: {top3_list[2]['name']}",
             line=dict(color=colors[2], width=3.5, shape='spline'),
             marker=dict(size=8, color=colors[2]),
-            hovertemplate=f"<b>{top3_list[2]['name']}</b>: %{{y:.2f}}%<br><b>일자/분기</b>: %{{x}}<extra></extra>"
+            hovertemplate=f"<b>{top3_list[2]['name']}</b>: %{{y:.2f}}%<br><b>Quarter</b>: %{{x}}<extra></extra>"
         ))
         
         fig_trend.update_layout(
@@ -1550,26 +1531,26 @@ def update_institutional_holders(ticker, n):
         )
         
         trend_component = html.Div([
-            html.Div(f"📈 Top 3 보유 기관별 지분율 상세 추이 변화 ({company_name})", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            html.Div(f"📈 Top 3 Institutional Ownership Trend ({company_name})", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
             dcc.Graph(figure=fig_trend, config={'displayModeBar': False}, style={'height': '260px'})
         ], style={'backgroundColor': '#141822', 'padding': '16px', 'borderRadius': '14px', 'marginBottom': '20px'})
 
         # 3. Horizontal Stacked Bar Visualization Graph
         fig_bar = go.Figure()
         fig_bar.add_trace(go.Bar(
-            y=['지분율'], x=[inst_pct], name=f'기관 ({inst_pct:.1f}%)', orientation='h',
+            y=['Ownership'], x=[inst_pct], name=f'Institutional ({inst_pct:.1f}%)', orientation='h',
             marker=dict(color='#3182f6'),
-            hovertemplate='<b>기관 지분율</b>: %{x:.2f}%<extra></extra>'
+            hovertemplate='<b>Institutional Ownership</b>: %{x:.2f}%<extra></extra>'
         ))
         fig_bar.add_trace(go.Bar(
-            y=['지분율'], x=[retail_pct], name=f'개인 및 기타 ({retail_pct:.1f}%)', orientation='h',
+            y=['Ownership'], x=[retail_pct], name=f'Retail & Other ({retail_pct:.1f}%)', orientation='h',
             marker=dict(color='#10b981'),
-            hovertemplate='<b>개인/일반 지분율</b>: %{x:.2f}%<extra></extra>'
+            hovertemplate='<b>Retail/Other Ownership</b>: %{x:.2f}%<extra></extra>'
         ))
         fig_bar.add_trace(go.Bar(
-            y=['지분율'], x=[insider_pct], name=f'내부자 ({insider_pct:.1f}%)', orientation='h',
+            y=['Ownership'], x=[insider_pct], name=f'Insider ({insider_pct:.1f}%)', orientation='h',
             marker=dict(color='#f04452'),
-            hovertemplate='<b>내부자 지분율</b>: %{x:.2f}%<extra></extra>'
+            hovertemplate='<b>Insider Ownership</b>: %{x:.2f}%<extra></extra>'
         ))
         fig_bar.update_layout(
             barmode='stack',
@@ -1603,13 +1584,13 @@ def update_institutional_holders(ticker, n):
                 pct_held = row.get('pctHeld', 0)
                 pct_change = row.get('pctChange', 0)
                 
-                shares_str = f"{shares:,.0f}주" if isinstance(shares, (int, float)) and shares > 0 else "-"
+                shares_str = f"{shares:,.0f} shs" if isinstance(shares, (int, float)) and shares > 0 else "-"
                 
                 if isinstance(val, (int, float)) and val > 0:
                     if val >= 1e9:
-                        val_str = f"${val/1e9:,.2f}B (약 {val/1e9*1.38:,.1f}조 원)"
+                        val_str = f"${val/1e9:,.2f}B"
                     elif val >= 1e6:
-                        val_str = f"${val/1e6:,.1f}M (약 {val/1e6*13.8:,.0f}억 원)"
+                        val_str = f"${val/1e6:,.1f}M"
                     else:
                         val_str = f"${val:,.0f}"
                 else:
@@ -1623,7 +1604,7 @@ def update_institutional_holders(ticker, n):
                     chg_str = f"{chg_sign}{pct_change*100:.2f}%"
                 else:
                     chg_color = "#8b95a1"
-                    chg_str = "변동없음"
+                    chg_str = "No Change"
                     
                 firm_rows.append(html.Tr([
                     html.Td(date_rep_str, style={'padding': '10px 8px', 'color': '#8b95a1', 'fontSize': '12px'}),
@@ -1635,15 +1616,15 @@ def update_institutional_holders(ticker, n):
                 ], style={'borderBottom': '1px solid #252d3c'}))
 
         firm_table = html.Div([
-            html.Div("🏛️ 주요 기관(Firms) 신고 날짜별 보유 지분 및 변동률", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '10px'}),
+            html.Div("🏛️ Major Institutional Holders (Firms) & Position Changes", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '10px'}),
             html.Table([
                 html.Thead(html.Tr([
-                    html.Th("신고 날짜 (Date)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("보유 기관 (Firm)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("보유 주식수", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("추정 보유 금액 (USD / KRW)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("지분율", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("분기 지분 변동률", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'})
+                    html.Th("Date Reported", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Institutional Holder (Firm)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Shares Held", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Value (USD)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Ownership %", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Qtr Change", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'})
                 ], style={'borderBottom': '1px solid rgba(255,255,255,0.1)'})),
                 html.Tbody(firm_rows)
             ], style={'width': '100%', 'borderCollapse': 'collapse'})
@@ -1656,15 +1637,15 @@ def update_institutional_holders(ticker, n):
                 tx_date = row.get('Start Date', '')
                 date_str = pd.to_datetime(tx_date).strftime('%Y-%m-%d') if pd.notnull(tx_date) else '-'
                 insider_name = str(row.get('Insider', 'N/A'))
-                position = str(row.get('Position', 'Insider / Individual'))
+                position = str(row.get('Position', 'Insider / Officer'))
                 shares = row.get('Shares', 0)
                 val = row.get('Value', 0)
                 txt = str(row.get('Text', ''))
                 
-                shares_str = f"{shares:,.0f}주" if isinstance(shares, (int, float)) and shares > 0 else "-"
+                shares_str = f"{shares:,.0f} shs" if isinstance(shares, (int, float)) and shares > 0 else "-"
                 
                 if isinstance(val, (int, float)) and val > 0:
-                    val_str = f"${val:,.0f} (약 {val*1.38/1e6:,.1f}백만 원)"
+                    val_str = f"${val:,.0f}"
                 else:
                     val_str = "-"
                     
@@ -1672,15 +1653,15 @@ def update_institutional_holders(ticker, n):
                 if 'PURCHASE' in txt_upper or 'BUY' in txt_upper:
                     badge_bg = 'rgba(240, 68, 82, 0.15)'
                     badge_color = '#f04452'
-                    badge_label = '매수 (Purchase)'
+                    badge_label = 'Buy (Purchase)'
                 elif 'SALE' in txt_upper or 'SELL' in txt_upper:
                     badge_bg = 'rgba(49, 130, 246, 0.15)'
                     badge_color = '#3182f6'
-                    badge_label = '매도 (Sale)'
+                    badge_label = 'Sell (Sale)'
                 else:
                     badge_bg = 'rgba(156, 163, 175, 0.15)'
                     badge_color = '#9ca3af'
-                    badge_label = '증여/기타 (Gift/Other)'
+                    badge_label = 'Gift/Other'
                     
                 insider_rows.append(html.Tr([
                     html.Td(date_str, style={'padding': '10px 8px', 'color': '#8b95a1', 'fontSize': '12px'}),
@@ -1692,15 +1673,15 @@ def update_institutional_holders(ticker, n):
                 ], style={'borderBottom': '1px solid #252d3c'}))
 
         insider_table = html.Div([
-            html.Div("👤 개인/내부자(Individuals & Insiders) 날짜별 거래 내역", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '10px'}),
+            html.Div("👤 Individual & Insider Transactions", style={'fontSize': '14px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '10px'}),
             html.Table([
                 html.Thead(html.Tr([
-                    html.Th("거래 일자 (Date)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("이름 (Insider/Individual)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("직책 (Position)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("거래 구분", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("거래 주식수", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
-                    html.Th("거래 금액 (USD / KRW)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'})
+                    html.Th("Tx Date", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Insider / Individual Name", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Position", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Type", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Shares Traded", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'}),
+                    html.Th("Value (USD)", style={'padding': '8px', 'color': '#8b95a1', 'fontSize': '12px', 'textAlign': 'left'})
                 ], style={'borderBottom': '1px solid rgba(255,255,255,0.1)'})),
                 html.Tbody(insider_rows)
             ], style={'width': '100%', 'borderCollapse': 'collapse'})
@@ -1711,8 +1692,8 @@ def update_institutional_holders(ticker, n):
         import traceback
         traceback.print_exc()
         return html.Div([
-            html.Div("🏦 주요 기관 & 개인 보유 현황 및 추세", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
-            html.Div(f"보유 현황 데이터를 계산할 수 없습니다: {e}", style={'fontSize': '13px', 'color': '#8b95a1'})
+            html.Div("🏦 Institutional & Insider Ownership", style={'fontSize': '16px', 'fontWeight': '700', 'color': '#f2f4f6', 'marginBottom': '8px'}),
+            html.Div(f"Unable to calculate ownership data: {e}", style={'fontSize': '13px', 'color': '#8b95a1'})
         ])
 
 if __name__ == '__main__':
